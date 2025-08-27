@@ -7,6 +7,12 @@
   "scripts": {
     "start-server": "npm --workspace client run build && NODE_ENV=production node server/index.js",
     "start-server-win": "npm --workspace client run build && SET NODE_ENV=production && node server/index.js",
-    "update": "git pull && npm install && npm run start-server"
+    "docker:run": "docker-compose up -d",
+    "update": "git pull && npm install",
+    "update:manual": "npm run update && npm run start-server",
+    "update:docker": "git pull && docker-compose build --pull && docker-compose up -d",
+    "docker:build": "docker build -t subarr .",
+    "docker:stop": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
   }
 }

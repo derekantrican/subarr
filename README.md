@@ -81,6 +81,37 @@ Subarr is NOT intended to do the following:
 
 ### Installation
 
+#### Docker (Recommended)
+
+```bash
+git clone https://github.com/derekantrican/subarr.git
+cd subarr
+docker-compose up -d
+```
+
+The app will be available at `http://localhost:3001`
+
+#### Helpful Docker Scripts
+
+From the project root you can use the following npm scripts (they just wrap common docker-compose commands):
+
+```
+npm run docker:run       # Start (build if needed) in background
+npm run docker:logs      # Follow logs
+npm run docker:stop      # Stop and remove container
+npm run docker:update    # git pull then rebuild using latest base images and recreate
+npm run docker:restart   # Restart container (down + up -d)
+```
+
+Typical update workflow if you deployed via git clone:
+
+```
+cd subarr
+npm run docker:update
+```
+
+#### Manual Installation
+
 Make sure you have Node >= 18 installed, then run the following:
 
 ```
