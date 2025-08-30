@@ -99,7 +99,7 @@ From the project root you can use the following npm scripts (they just wrap comm
 npm run docker:run       # Start (build if needed) in background
 npm run docker:logs      # Follow logs
 npm run docker:stop      # Stop and remove container
-npm run docker:update    # git pull then rebuild using latest base images and recreate
+npm run update:docker    # git pull then rebuild using latest base images and recreate
 npm run docker:restart   # Restart container (down + up -d)
 ```
 
@@ -107,7 +107,7 @@ Typical update workflow if you deployed via git clone:
 
 ```
 cd subarr
-npm run docker:update
+npm run update:docker
 ```
 
 #### Manual Installation
