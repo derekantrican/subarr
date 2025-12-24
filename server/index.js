@@ -98,7 +98,12 @@ app.get('/api/playlists/:id', (req, res) => {
 
 app.put('/api/playlists/:id/settings', (req, res) => {
   const { check_interval_minutes, regex_filter } = req.body;
-  updatePlaylist(req.params.id, check_interval_minutes, regex_filter);
+
+  const playlist = getPlaylist(req.params.id);
+  if (!playlist)
+    return res.status(404).json({ error: 'Not found' });
+
+  updatePlaylist(playlist.playlist_id, check_interval_minutes, regex_filter);
 
   const updatedPlaylist = getPlaylist(req.params.id);
   schedulePolling(updatedPlaylist); // reschedules with updated values
