@@ -61,7 +61,13 @@ async function tryParseAdditionalChannelData(url) {
   }
 
   // Also grep the channel thumbnail from the HTML source code (which could also be done for description, etc in the future)
-  const channelThumbnailMatch = /"avatarViewModel":{"image":{"sources":(?<avatar_array>\[[^\]]+\])/.exec(responseText);
+  // Use the more specific "decoratedAvatarViewModel" pattern to target the channel's own header avatar,
+  // avoiding false matches from collaborator/featured channel avatars elsewhere on the page.
+  const channelThumbnailMatch = (
+    /"decoratedAvatarViewModel":\{"avatar":\{"avatarViewModel":\{"image":\{"sources":(?<avatar_array>\[[^\]]+\])/.exec(responseText)
+    ?? /"avatarViewModel":\{"image":\{"sources":(?<avatar_array>\[[^\]]+\])/.exec(responseText)
+  );
+  
   if (channelThumbnailMatch) {
     const avatarArray = JSON.parse(channelThumbnailMatch.groups.avatar_array);
     channelInfo.thumbnail = avatarArray.find(a => a.width === 160)?.url ?? avatarArray[0].url;
