@@ -1,0 +1,24 @@
+# Please run `git pull` before running this compose
+services:
+  subarr:
+    build: .
+    container_name: subarr
+    ports:
+      - "3001:3001"
+    volumes:
+      - subarr_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/app/data/subarr.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  subarr_data:
+    driver: local
