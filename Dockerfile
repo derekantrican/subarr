@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Subarr
-FROM node:alpine3.22 AS base
+FROM node:24-alpine3.22 AS base
 
 # Install system dependencies required for better-sqlite3
 RUN apk add --no-cache \
@@ -31,7 +31,7 @@ COPY server/ ./server/
 # Build the client
 RUN npm --workspace client run build
 
-FROM node:alpine3.22 AS production
+FROM node:24-alpine3.22 AS production
 
 # Install only runtime dependencies
 RUN apk add --no-cache sqlite
