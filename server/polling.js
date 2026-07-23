@@ -1,7 +1,8 @@
 const { parseVideosFromFeed } = require('./rssParser');
 const { runPostProcessor } = require('./postProcessors');
+const { downloadVideo } = require('./downloads');
 const { fetchWithRetry, tryParseAdditionalChannelData } = require('./utils');
-const { getPostProcessors, getSettings, insertActivity, insertPlaylist, getPlaylists, deletePlaylist, updatePlaylist } = require('./dbQueries');
+const { getPostProcessors, getSettings, insertActivity, insertPlaylist, getPlaylists, deletePlaylist, updatePlaylist, insertDownload, updateDownload } = require('./dbQueries');
 
 const pollingJobs = new Map(); // Map of playlistId -> { intervalId, intervalMinutes, regex }
 
@@ -120,6 +121,43 @@ async function pollPlaylist(playlist, alertForNewVideos = true) {
 
       console.log(`New video found: ${video.title}`);
       insertActivity(playlist.playlist_id, video.title, `https://www.youtube.com/watch?v=${video.video_id}`, 'New video found!', 'camera-video-fill');
+
+      let downloadId = null;
+      try {
+        if ((playlist.download_enabled ? playlist.download_enabled === 'true' : (settings.download_enabled ?? 'false') === 'true')) {
+          downloadId = insertDownload({
+            playlist_id: playlist.playlist_id,
+            video_id: video.video_id,
+            title: video.title,
+            status: 'downloading',
+            started_at: new Date().toISOString(),
+            manual: 'false',
+          }).lastInsertRowid;
+        }
+
+        const result = await downloadVideo(settings, { video, playlist });
+        if (result !== null) {
+          if (downloadId) {
+            updateDownload(downloadId, {
+              status: 'completed',
+              output_path: result.outputPath,
+              finished_at: new Date().toISOString(),
+            });
+          }
+          insertActivity(playlist.playlist_id, video.title, null, 'Video downloaded', 'download');
+        }
+      }
+      catch (error) {
+        if (downloadId) {
+          updateDownload(downloadId, {
+            status: 'failed',
+            error: error.message,
+            finished_at: new Date().toISOString(),
+          });
+        }
+        console.error(`Error downloading '${video.title}':`, error);
+        insertActivity(playlist.playlist_id, video.title, null, `Download failed: ${error.message}`, 'exclamation-triangle-fill');
+      }
 
       for (const postProcessor of getPostProcessors()) {
         try {

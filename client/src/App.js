@@ -6,6 +6,7 @@ import SubscriptionsPage from './pages/SubscriptionsPage';
 import PlaylistDetailsPage from './pages/PlaylistDetailsPage';
 import AddPlaylistPage from './pages/AddPlaylistPage';
 import ActivityPage from './pages/ActivityPage';
+import DownloadsPage from './pages/DownloadsPage';
 import SettingsPage from './pages/SettingsPage';
 import DialogBase from './components/DialogBase';
 import SearchResults from './components/SearchResults';
@@ -130,6 +131,12 @@ function AppLayout() {
                 Activity
               </NavLink>
             </div>
+            <div className={`navgroup ${location.pathname === '/downloads' ? 'active' : ''}`}>
+              <NavLink to="/downloads" onClick={() => setSidebarOpen(false)}>
+                <i className="bi bi-download" style={{fontSize: 'medium', marginRight: 5}}></i>
+                Downloads
+              </NavLink>
+            </div>
             <div className={`navgroup ${location.pathname === '/settings' ? 'active' : ''}`}>
               <NavLink to="/settings" className={({ isActive }) => isActive ? 'active-link' : ''} onClick={() => setSidebarOpen(false)}>
                 <i className="bi bi-gear-fill" style={{fontSize: 'medium', marginRight: 5}}></i>
@@ -143,6 +150,7 @@ function AppLayout() {
             <Route path="/" element={<SubscriptionsPage searchTerm={searchTerm} />} />
             <Route path="/add" element={<AddPlaylistPage />} />
             <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/downloads" element={<DownloadsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/playlist/:id" element={<PlaylistDetailsPage />} />
           </Routes>

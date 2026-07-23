@@ -28,6 +28,7 @@ Thumbs.db
 /client/dist/
 /client/.next/
 /client/.turbo/
+/downloads/
 
 # React testing
 /client/coverage/

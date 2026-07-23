@@ -33,8 +33,10 @@ RUN npm --workspace client run build
 
 FROM node:24-alpine3.22 AS production
 
-# Install only runtime dependencies
-RUN apk add --no-cache sqlite
+# Install runtime dependencies. yt-dlp handles the actual video downloads, and
+# ffmpeg is needed for common format merging/conversion paths.
+RUN apk add --no-cache sqlite python3 py3-pip ffmpeg su-exec \
+ && pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S subarr && \
@@ -47,6 +49,7 @@ COPY --from=builder --chown=subarr:subarr /app/node_modules ./node_modules
 COPY --from=builder --chown=subarr:subarr /app/client/build ./client/build
 COPY --from=builder --chown=subarr:subarr /app/server ./server
 COPY --from=builder --chown=subarr:subarr /app/package.json ./
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Rebuild native module for runtime architecture (avoids Exec format error)
 RUN apk add --no-cache python3 make g++ sqlite-dev linux-headers \
@@ -54,11 +57,10 @@ RUN apk add --no-cache python3 make g++ sqlite-dev linux-headers \
  && apk del python3 make g++ sqlite-dev linux-headers \
  && rm -rf /root/.npm /root/.cache
 
-# Create data directory for database persistence
-RUN mkdir -p /app/data && chown subarr:subarr /app/data
-
-# Switch to non-root user
-USER subarr
+# Create data/download directories for persistence
+RUN mkdir -p /app/data /downloads \
+ && chown subarr:subarr /app/data /downloads \
+ && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Expose port
 EXPOSE 3001
@@ -68,4 +70,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/playlists || exit 1
 
 # Start the server
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]

@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react';
+import DirectoryInput from '../components/DirectoryInput';
 import PostProcessorDialog from '../components/PostProcessorDialog';
 import { showToast } from '../utils/utils';
 
 function SettingsPage() {
   const [ytsubsApiKey, setYtsubsApiKey] = useState('');
   const [excludeShorts, setExcludeShorts] = useState(false);
+  const [downloadEnabled, setDownloadEnabled] = useState(false);
+  const [downloadDir, setDownloadDir] = useState('/downloads');
+  const [ytdlpPath, setYtdlpPath] = useState('yt-dlp');
+  const [downloadOutputTemplate, setDownloadOutputTemplate] = useState('[[playlist.title]]/%(title)s.%(ext)s');
+  const [ytdlpFormat, setYtdlpFormat] = useState('bestvideo+bestaudio/best');
+  const [ytdlpMediaType, setYtdlpMediaType] = useState('video');
+  const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('default');
+  const [ytdlpAudioFormat, setYtdlpAudioFormat] = useState('mp3');
+  const [ytdlpSubtitles, setYtdlpSubtitles] = useState('none');
+  const [ytdlpSubtitleLangs, setYtdlpSubtitleLangs] = useState('en.*');
+  const [ytdlpEmbedSubtitles, setYtdlpEmbedSubtitles] = useState(false);
+  const [ytdlpExtraArgs, setYtdlpExtraArgs] = useState('');
   const [postProcessors, setPostProcessors] = useState([]);
 
   const [editingPostProcessor, setEditingPostProcessor] = useState(null);
@@ -24,6 +37,18 @@ function SettingsPage() {
       .then(data => {
         setYtsubsApiKey(data.ytsubs_apikey ?? '');
         setExcludeShorts((data.exclude_shorts ?? 'false') === 'true'); // SQLite can't store bool
+        setDownloadEnabled((data.download_enabled ?? 'false') === 'true');
+        setDownloadDir(data.download_dir ?? '/downloads');
+        setYtdlpPath(data.ytdlp_path ?? 'yt-dlp');
+        setDownloadOutputTemplate(data.download_output_template ?? '[[playlist.title]]/%(title)s.%(ext)s');
+        setYtdlpFormat(data.ytdlp_format ?? 'bestvideo+bestaudio/best');
+        setYtdlpMediaType(data.ytdlp_media_type ?? 'video');
+        setYtdlpVideoContainer(data.ytdlp_video_container ?? 'default');
+        setYtdlpAudioFormat(data.ytdlp_audio_format ?? 'mp3');
+        setYtdlpSubtitles(data.ytdlp_subtitles ?? 'none');
+        setYtdlpSubtitleLangs(data.ytdlp_subtitle_langs ?? 'en.*');
+        setYtdlpEmbedSubtitles((data.ytdlp_embed_subtitles ?? 'false') === 'true');
+        setYtdlpExtraArgs(data.ytdlp_extra_args ?? '');
       })
       .catch(err => {
         console.error('Failed to fetch settings', err);
@@ -48,6 +73,18 @@ function SettingsPage() {
         body: JSON.stringify({
           ytsubs_apikey: ytsubsApiKey,
           exclude_shorts: String(excludeShorts), // SQLite can't store bool
+          download_enabled: String(downloadEnabled),
+          download_dir: downloadDir,
+          ytdlp_path: ytdlpPath,
+          download_output_template: downloadOutputTemplate,
+          ytdlp_format: ytdlpFormat,
+          ytdlp_media_type: ytdlpMediaType,
+          ytdlp_video_container: ytdlpVideoContainer,
+          ytdlp_audio_format: ytdlpAudioFormat,
+          ytdlp_subtitles: ytdlpSubtitles,
+          ytdlp_subtitle_langs: ytdlpSubtitleLangs,
+          ytdlp_embed_subtitles: String(ytdlpEmbedSubtitles),
+          ytdlp_extra_args: ytdlpExtraArgs,
         }),
       });
   
@@ -74,7 +111,7 @@ function SettingsPage() {
           <div style={{fontSize: 'small'}}>Save</div>
         </button>
       </div>
-      <div style={{display: 'flex', flexDirection: 'column', height: 'calc(100% - 120px)' /* Todo: not sure why this has to be 120 and not 60 */, padding: 30}}>
+      <div style={{display: 'flex', flexDirection: 'column', height: 'calc(100% - 120px)' /* Todo: not sure why this has to be 120 and not 60 */, padding: 30, overflowY: 'auto'}}>
         <div style={{fontWeight: 'bold', fontSize: 'xx-large'}}>
           Settings
         </div>
@@ -93,6 +130,107 @@ function SettingsPage() {
             <input type='checkbox' checked={excludeShorts} onChange={e => setExcludeShorts(e.target.checked)}/>
             <span className="checkmark"></span>
           </label>
+        </div>
+        <div style={{marginTop: 50, fontWeight: 'bold', fontSize: 'xx-large'}}>
+          Downloads
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Download new videos</div>
+          <label className='container'>
+            <div style={{fontSize: 'small', textAlign: 'center'}}>Run yt-dlp when a watched playlist finds a new video</div>
+            <input type='checkbox' checked={downloadEnabled} onChange={e => setDownloadEnabled(e.target.checked)}/>
+            <span className="checkmark"></span>
+          </label>
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Download directory</div>
+          <DirectoryInput
+            value={downloadDir}
+            onChange={setDownloadDir}
+          />
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>yt-dlp path</div>
+          <input type="text"
+            value={ytdlpPath}
+            onChange={e => setYtdlpPath(e.target.value)}
+          />
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Output template</div>
+          <textarea style={{resize: 'vertical', width: 'calc(100% - 18px)', minHeight: 70}}
+            value={downloadOutputTemplate}
+            onChange={e => setDownloadOutputTemplate(e.target.value)}
+          />
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Format selector</div>
+          <input type="text"
+            value={ytdlpFormat}
+            onChange={e => setYtdlpFormat(e.target.value)}
+          />
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Media type</div>
+          <select value={ytdlpMediaType} onChange={e => setYtdlpMediaType(e.target.value)}>
+            <option value="video">Video</option>
+            <option value="audio">Audio only</option>
+          </select>
+        </div>
+        {ytdlpMediaType === 'video' ?
+          <div className='setting flex-column-mobile'>
+            <div style={{minWidth: 175}}>Video container</div>
+            <select value={ytdlpVideoContainer} onChange={e => setYtdlpVideoContainer(e.target.value)}>
+              <option value="default">Best available</option>
+              <option value="mp4">MP4</option>
+              <option value="mkv">MKV</option>
+              <option value="webm">WebM</option>
+              <option value="mov">MOV</option>
+            </select>
+          </div>
+        :
+          <div className='setting flex-column-mobile'>
+            <div style={{minWidth: 175}}>Audio format</div>
+            <select value={ytdlpAudioFormat} onChange={e => setYtdlpAudioFormat(e.target.value)}>
+              <option value="mp3">MP3</option>
+              <option value="m4a">M4A</option>
+              <option value="flac">FLAC</option>
+              <option value="opus">Opus</option>
+              <option value="wav">WAV</option>
+              <option value="best">Best available</option>
+            </select>
+          </div>
+        }
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Subtitles</div>
+          <select value={ytdlpSubtitles} onChange={e => setYtdlpSubtitles(e.target.value)}>
+            <option value="none">None</option>
+            <option value="manual">Creator subtitles</option>
+            <option value="auto">Auto-generated subtitles</option>
+            <option value="both">Creator + auto-generated</option>
+          </select>
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Subtitle languages</div>
+          <input type="text"
+            value={ytdlpSubtitleLangs}
+            onChange={e => setYtdlpSubtitleLangs(e.target.value)}
+          />
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Embed subtitles</div>
+          <label className='container'>
+            <div style={{fontSize: 'small', textAlign: 'center'}}>Embed subtitles into video files when yt-dlp can</div>
+            <input type='checkbox' checked={ytdlpEmbedSubtitles} onChange={e => setYtdlpEmbedSubtitles(e.target.checked)}/>
+            <span className="checkmark"></span>
+          </label>
+        </div>
+        <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>Extra yt-dlp args</div>
+          <textarea style={{resize: 'vertical', width: 'calc(100% - 18px)', minHeight: 70}}
+            value={ytdlpExtraArgs}
+            onChange={e => setYtdlpExtraArgs(e.target.value)}
+          />
         </div>
         {/* Todo: eventually, I think "Post Processors" should be a separate page under Settings (like Sonarr's "Connect") */}
         <div style={{marginTop: 50, fontWeight: 'bold', fontSize: 'xx-large'}}>

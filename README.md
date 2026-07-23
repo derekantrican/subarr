@@ -62,6 +62,24 @@ Subarr is NOT intended to do the following:
 - Media management. Once Subarr kicks off the post-processor (like yt-dlp), its job is done. Use Plex/Jellyfin/etc or another one of the linked solutions above if you require more control over your media
 
 
+### Downloading new videos
+
+The Docker image includes `yt-dlp` and `ffmpeg`. To automatically download newly discovered videos, open Settings, enable **Download new videos**, and set the download directory. The default Docker path is `/downloads`, which is mounted to `./downloads` next to your `docker-compose.yml`.
+
+The default output template is:
+
+```text
+[[playlist.title]]/%(title)s.%(ext)s
+```
+
+That means videos download into one folder per channel/playlist under the configured download directory. You can also set the global `yt-dlp` format selector and extra args in Settings.
+
+Each playlist/channel can override the global download toggle, download directory, output template, format selector, and extra args from its details page. Already-seen videos also have a manual download button on the details page.
+
+Download attempts are tracked on the **Downloads** page, including status, output path, whether the download was manual or automatic, and any failure message.
+
+Downloads can be saved as video or audio-only. Video downloads can request a merge container such as `mp4`, `mkv`, or `webm`; audio-only downloads can be extracted as `mp3`, `m4a`, `flac`, `opus`, or `wav`. Subtitle options support creator subtitles, auto-generated subtitles, or both, with language selectors such as `en.*` or `en.*,ja`.
+
 ### Current features
 
 - Add playlists
@@ -96,6 +114,7 @@ services:
       - "3001:3001"
     volumes:
       - subarr_data:/app/data
+      - ./downloads:/downloads
     environment:
       - NODE_ENV=production
       - PORT=3001

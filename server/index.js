@@ -1,10 +1,22 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const { parseVideosFromFeed } = require('./rssParser');
 const { schedulePolling, updateYtSubsPlaylists, removePolling } = require('./polling');
 const { runPostProcessor } = require('./postProcessors');
+const {
+  DEFAULT_DOWNLOAD_DIR,
+  DEFAULT_OUTPUT_TEMPLATE,
+  DEFAULT_FORMAT,
+  DEFAULT_MEDIA_TYPE,
+  DEFAULT_VIDEO_CONTAINER,
+  DEFAULT_AUDIO_FORMAT,
+  DEFAULT_SUBTITLES,
+  DEFAULT_SUBTITLE_LANGS,
+  downloadVideo,
+} = require('./downloads');
 const { tryParseAdditionalChannelData, getMeta } = require('./utils');
 const {
   getPlaylists,
@@ -13,6 +25,7 @@ const {
   getPlaylist,
   insertActivity,
   updatePlaylist,
+  updatePlaylistSettings,
   deletePlaylist,
   deleteVideosForPlaylist,
   getActivitiesCount,
@@ -20,8 +33,14 @@ const {
   insertSettings,
   getPostProcessors,
   insertPostProcessor,
+  updatePostProcessor,
   deletePostProcessor,
-  getVideosForPlaylist
+  getVideosForPlaylist,
+  getVideoForPlaylist,
+  insertDownload,
+  updateDownload,
+  getDownloadsCount,
+  getDownloads
 } = require('./dbQueries');
 
 const playlists = getPlaylists();
@@ -38,6 +57,42 @@ updateYtSubsPlaylists(); // also run on startup
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.get('/api/filesystem/directories', async (req, res) => {
+  const requestedPath = req.query.path || DEFAULT_DOWNLOAD_DIR;
+  const resolvedPath = path.resolve(requestedPath);
+
+  try {
+    const stat = await fs.promises.stat(resolvedPath);
+    if (!stat.isDirectory()) {
+      return res.status(400).json({ error: 'Path is not a directory' });
+    }
+
+    const entries = await fs.promises.readdir(resolvedPath, { withFileTypes: true });
+    const directories = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(resolvedPath, entry.name))
+      .sort((a, b) => a.localeCompare(b))
+      .map(dirPath => ({
+        name: path.basename(dirPath) || dirPath,
+        path: dirPath,
+      }));
+
+    res.json({
+      path: resolvedPath,
+      parent: path.dirname(resolvedPath) === resolvedPath ? null : path.dirname(resolvedPath),
+      roots: [
+        { name: 'Downloads', path: DEFAULT_DOWNLOAD_DIR },
+        { name: 'App data', path: '/app/data' },
+        { name: 'Filesystem', path: '/' },
+      ],
+      directories,
+    });
+  }
+  catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 app.get('/api/playlists', (req, res) => {
   res.json(getPlaylists());
@@ -97,18 +152,95 @@ app.get('/api/playlists/:id', (req, res) => {
 });
 
 app.put('/api/playlists/:id/settings', (req, res) => {
-  const { check_interval_minutes, regex_filter } = req.body;
+  const {
+    check_interval_minutes,
+    regex_filter,
+    download_enabled,
+    download_dir,
+    download_output_template,
+    ytdlp_format,
+    ytdlp_media_type,
+    ytdlp_video_container,
+    ytdlp_audio_format,
+    ytdlp_subtitles,
+    ytdlp_subtitle_langs,
+    ytdlp_embed_subtitles,
+    ytdlp_extra_args,
+  } = req.body;
 
   const playlist = getPlaylist(req.params.id);
   if (!playlist)
     return res.status(404).json({ error: 'Not found' });
 
-  updatePlaylist(playlist.playlist_id, check_interval_minutes, regex_filter);
+  updatePlaylistSettings(playlist.playlist_id, {
+    check_interval_minutes,
+    regex_filter,
+    download_enabled,
+    download_dir,
+    download_output_template,
+    ytdlp_format,
+    ytdlp_media_type,
+    ytdlp_video_container,
+    ytdlp_audio_format,
+    ytdlp_subtitles,
+    ytdlp_subtitle_langs,
+    ytdlp_embed_subtitles,
+    ytdlp_extra_args,
+  });
 
   const updatedPlaylist = getPlaylist(req.params.id);
   schedulePolling(updatedPlaylist); // reschedules with updated values
 
   res.json({ success: true });
+});
+
+app.post('/api/playlists/:id/videos/:videoId/download', async (req, res) => {
+  const playlist = getPlaylist(req.params.id);
+  if (!playlist)
+    return res.status(404).json({ error: 'Playlist not found' });
+
+  const video = getVideoForPlaylist(playlist.playlist_id, req.params.videoId);
+  if (!video)
+    return res.status(404).json({ error: 'Video not found' });
+
+  const settings = Object.fromEntries(getSettings().map(row => [row.key, row.value]));
+  const downloadId = insertDownload({
+    playlist_id: playlist.playlist_id,
+    video_id: video.video_id,
+    title: video.title,
+    status: 'downloading',
+    started_at: new Date().toISOString(),
+    manual: 'true',
+  }).lastInsertRowid;
+
+  try {
+    const result = await downloadVideo(settings, {
+      playlist,
+      video: {
+        title: video.title,
+        video_id: video.video_id,
+        thumbnail: video.thumbnail,
+        published_at: video.published_at,
+      },
+    }, { force: true });
+
+    updateDownload(downloadId, {
+      status: 'completed',
+      output_path: result.outputPath,
+      finished_at: new Date().toISOString(),
+    });
+    insertActivity(playlist.playlist_id, video.title, null, 'Manual download requested', 'download');
+    res.json({ success: true });
+  }
+  catch (err) {
+    updateDownload(downloadId, {
+      status: 'failed',
+      error: err.message,
+      finished_at: new Date().toISOString(),
+    });
+    insertActivity(playlist.playlist_id, video.title, null, `Manual download failed: ${err.message}`, 'exclamation-triangle-fill');
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/api/playlists/:id', (req, res) => {
@@ -190,11 +322,40 @@ app.get('/api/activity/:page', (req, res) => {
   });
 });
 
+app.get('/api/downloads/:page', (req, res) => {
+  const pageSize = 20;
+  const totalCountRow = getDownloadsCount();
+  const totalPages = Math.max(1, Math.ceil(totalCountRow.count / pageSize));
+  const requestedPage = parseInt(req.params.page) || 1;
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
+  const offset = (page - 1) * pageSize;
+
+  res.json({
+    page,
+    totalPages,
+    downloads: getDownloads(pageSize, offset),
+  });
+});
+
 // Sonarr general settings (apikey, urlbase, port, etc) are stored in C:\ProgramData\Sonarr\config.xml. Maybe we should do the same for our .env or something
 
 app.get('/api/settings', (req, res) => {
   const settings = Object.fromEntries(getSettings().map(row => [row.key, row.value]));
-  res.json(settings);
+  res.json({
+    download_enabled: 'false',
+    download_dir: DEFAULT_DOWNLOAD_DIR,
+    ytdlp_path: 'yt-dlp',
+    download_output_template: DEFAULT_OUTPUT_TEMPLATE,
+    ytdlp_format: DEFAULT_FORMAT,
+    ytdlp_media_type: DEFAULT_MEDIA_TYPE,
+    ytdlp_video_container: DEFAULT_VIDEO_CONTAINER,
+    ytdlp_audio_format: DEFAULT_AUDIO_FORMAT,
+    ytdlp_subtitles: DEFAULT_SUBTITLES,
+    ytdlp_subtitle_langs: DEFAULT_SUBTITLE_LANGS,
+    ytdlp_embed_subtitles: 'false',
+    ytdlp_extra_args: '',
+    ...settings,
+  });
 });
 
 app.put('/api/settings', (req, res) => {
@@ -229,7 +390,7 @@ app.put('/api/postprocessors/:id', (req, res) => {
   if (!name || !type || !target || !data)
     return res.status(400).json({ error: 'Missing fields' });
 
-  const result = updatePostProcessor(name, type, target, data, req.params.id);
+  const result = updatePostProcessor(req.params.id, name, type, target, data);
 
   if (result.changes === 0)
     return res.status(404).json({ error: 'Not found' });

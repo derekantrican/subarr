@@ -75,12 +75,49 @@ function updatePlaylist(playlist_id, check_interval_minutes = undefined, regex_f
   db.prepare(sql).run(params);
 }
 
+function updatePlaylistSettings(playlist_id, settings) {
+  const allowedFields = [
+    'check_interval_minutes',
+    'regex_filter',
+    'download_enabled',
+    'download_dir',
+    'download_output_template',
+    'ytdlp_format',
+    'ytdlp_media_type',
+    'ytdlp_video_container',
+    'ytdlp_audio_format',
+    'ytdlp_subtitles',
+    'ytdlp_subtitle_langs',
+    'ytdlp_embed_subtitles',
+    'ytdlp_extra_args',
+  ];
+  const sets = [];
+  const params = { playlist_id };
+
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(settings, field) && settings[field] !== undefined) {
+      sets.push(`${field} = @${field}`);
+      params[field] = settings[field];
+    }
+  }
+
+  if (sets.length === 0) {
+    return { changes: 0 };
+  }
+
+  return db.prepare(`UPDATE playlists SET ${sets.join(', ')} WHERE playlist_id = @playlist_id`).run(params);
+}
+
 function deletePlaylist(playlistId) {
   db.prepare('DELETE FROM playlists WHERE playlist_id = ?').run(playlistId);
 }
 
 function getVideosForPlaylist(playlistId) {
   return db.prepare('SELECT * FROM videos WHERE playlist_id = ? ORDER BY published_at DESC').all(playlistId);
+}
+
+function getVideoForPlaylist(playlistId, videoId) {
+  return db.prepare('SELECT * FROM videos WHERE playlist_id = ? AND video_id = ?').get(playlistId, videoId);
 }
 
 function insertVideo(playlistId, videoId, videoTitle, publishedAt, videoThumbnail) {
@@ -157,13 +194,65 @@ function insertActivity(playlistId, title, url, message, icon) {
   .run(new Date().toISOString(), playlistId, title, url, message, icon);
 }
 
+function insertDownload(download) {
+  return db.prepare(`
+    INSERT INTO downloads (playlist_id, video_id, title, status, output_path, error, started_at, finished_at, manual)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    download.playlist_id,
+    download.video_id,
+    download.title,
+    download.status,
+    download.output_path,
+    download.error,
+    download.started_at,
+    download.finished_at,
+    download.manual ?? 'false'
+  );
+}
+
+function updateDownload(downloadId, fields) {
+  const allowedFields = ['status', 'output_path', 'error', 'finished_at'];
+  const sets = [];
+  const params = { id: downloadId };
+
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(fields, field)) {
+      sets.push(`${field} = @${field}`);
+      params[field] = fields[field];
+    }
+  }
+
+  if (sets.length === 0) {
+    return { changes: 0 };
+  }
+
+  return db.prepare(`UPDATE downloads SET ${sets.join(', ')} WHERE id = @id`).run(params);
+}
+
+function getDownloadsCount() {
+  return db.prepare(`SELECT COUNT(*) as count FROM downloads`).get();
+}
+
+function getDownloads(pageSize, offset) {
+  return db.prepare(`
+    SELECT d.*, p.id AS playlist_db_id, p.title AS playlist_title
+    FROM downloads d
+    LEFT JOIN playlists p ON d.playlist_id = p.playlist_id
+    ORDER BY d.id DESC
+    LIMIT ? OFFSET ?
+  `).all(pageSize, offset);
+}
+
 module.exports = { 
   getPlaylists,
   getPlaylist,
   insertPlaylist,
   updatePlaylist,
+  updatePlaylistSettings,
   deletePlaylist,
   getVideosForPlaylist,
+  getVideoForPlaylist,
   insertVideo,
   deleteVideosForPlaylist,
   getSettings,
@@ -175,4 +264,8 @@ module.exports = {
   getActivitiesCount,
   getActivities,
   insertActivity,
+  insertDownload,
+  updateDownload,
+  getDownloadsCount,
+  getDownloads,
 };

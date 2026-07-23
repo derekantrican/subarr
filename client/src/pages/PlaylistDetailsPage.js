@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import DirectoryInput from '../components/DirectoryInput';
 import Thumbnail from '../components/Thumbnail';
 import { showToast } from '../utils/utils';
 
@@ -10,8 +11,20 @@ function PlaylistDetailsPage() {
   const [playlist, setPlaylist] = useState(null);
   const [interval, setInterval] = useState(60);
   const [regex, setRegex] = useState('');
+  const [downloadEnabled, setDownloadEnabled] = useState('');
+  const [downloadDir, setDownloadDir] = useState('');
+  const [downloadOutputTemplate, setDownloadOutputTemplate] = useState('');
+  const [ytdlpFormat, setYtdlpFormat] = useState('');
+  const [ytdlpMediaType, setYtdlpMediaType] = useState('');
+  const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('');
+  const [ytdlpAudioFormat, setYtdlpAudioFormat] = useState('');
+  const [ytdlpSubtitles, setYtdlpSubtitles] = useState('');
+  const [ytdlpSubtitleLangs, setYtdlpSubtitleLangs] = useState('');
+  const [ytdlpEmbedSubtitles, setYtdlpEmbedSubtitles] = useState('');
+  const [ytdlpExtraArgs, setYtdlpExtraArgs] = useState('');
   const [videos, setVideos] = useState([]);
   const [testingRegex, setTestingRegex] = useState(false);
+  const [downloadingVideoIds, setDownloadingVideoIds] = useState(new Set());
 
   useEffect(() => {
     fetch(`/api/playlists/${id}`)
@@ -20,6 +33,17 @@ function PlaylistDetailsPage() {
         setPlaylist(data.playlist);
         setInterval(data.playlist.check_interval_minutes || 60);
         setRegex(data.playlist.regex_filter || '');
+        setDownloadEnabled(data.playlist.download_enabled ?? '');
+        setDownloadDir(data.playlist.download_dir ?? '');
+        setDownloadOutputTemplate(data.playlist.download_output_template ?? '');
+        setYtdlpFormat(data.playlist.ytdlp_format ?? '');
+        setYtdlpMediaType(data.playlist.ytdlp_media_type ?? '');
+        setYtdlpVideoContainer(data.playlist.ytdlp_video_container ?? '');
+        setYtdlpAudioFormat(data.playlist.ytdlp_audio_format ?? '');
+        setYtdlpSubtitles(data.playlist.ytdlp_subtitles ?? '');
+        setYtdlpSubtitleLangs(data.playlist.ytdlp_subtitle_langs ?? '');
+        setYtdlpEmbedSubtitles(data.playlist.ytdlp_embed_subtitles ?? '');
+        setYtdlpExtraArgs(data.playlist.ytdlp_extra_args ?? '');
         setVideos(data.videos || []);
       })
       .catch(err => {
@@ -35,6 +59,17 @@ function PlaylistDetailsPage() {
         body: JSON.stringify({
           check_interval_minutes: parseInt(interval),
           regex_filter: regex,
+          download_enabled: downloadEnabled,
+          download_dir: downloadDir,
+          download_output_template: downloadOutputTemplate,
+          ytdlp_format: ytdlpFormat,
+          ytdlp_media_type: ytdlpMediaType,
+          ytdlp_video_container: ytdlpVideoContainer,
+          ytdlp_audio_format: ytdlpAudioFormat,
+          ytdlp_subtitles: ytdlpSubtitles,
+          ytdlp_subtitle_langs: ytdlpSubtitleLangs,
+          ytdlp_embed_subtitles: ytdlpEmbedSubtitles,
+          ytdlp_extra_args: ytdlpExtraArgs,
         }),
       });
   
@@ -48,6 +83,34 @@ function PlaylistDetailsPage() {
       showToast('Error saving settings', 'error');
     }
   };  
+
+  const handleManualDownload = async (video) => {
+    setDownloadingVideoIds(prev => new Set(prev).add(video.video_id));
+
+    try {
+      const res = await fetch(`/api/playlists/${id}/videos/${video.video_id}/download`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Download failed' }));
+        throw new Error(error.error || 'Download failed');
+      }
+
+      showToast(`Download finished for '${video.title}'`, 'success');
+    }
+    catch (err) {
+      console.error(err);
+      showToast(`Download failed: ${err.message}`, 'error');
+    }
+    finally {
+      setDownloadingVideoIds(prev => {
+        const next = new Set(prev);
+        next.delete(video.video_id);
+        return next;
+      });
+    }
+  };
 
   const handleDelete = async () => {
     const confirmDelete = window.confirm('Are you sure you want to remove this playlist?'); // Todo: use DialogBase instead
@@ -86,9 +149,9 @@ function PlaylistDetailsPage() {
           <div style={{ fontSize: 'small' }}>Delete</div>
         </button>
       </div>
-      <div style={{height: 425, width: '100%', backgroundImage: playlist.banner ? `url(https://wsrv.nl/?url=${playlist.banner})` : '', backgroundColor: 'rgb(0, 0, 0, 0.7)',
+      <div style={{minHeight: 425, width: '100%', backgroundImage: playlist.banner ? `url(https://wsrv.nl/?url=${playlist.banner})` : '', backgroundColor: 'rgb(0, 0, 0, 0.7)',
                    backgroundSize: 'cover', backgroundBlendMode: 'darken'}}>
-        <div style={{height: 'calc(100% - 60px)', padding: 30, display: 'flex', gap: 40}}>
+        <div style={{minHeight: 365, padding: 30, display: 'flex', gap: 40}}>
           <Thumbnail className='playlistDetails-poster' height='350' width='350' src={playlist.thumbnail}/>
           <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
             <div style={{fontSize: 'xxx-large', overflowWrap: 'anywhere'}} title={playlist.playlist_id}>{playlist.title}</div>
@@ -118,6 +181,130 @@ function PlaylistDetailsPage() {
                   Test
                 </button>
               </div>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Downloads:</div>
+              <select
+                value={downloadEnabled}
+                onChange={e => setDownloadEnabled(e.target.value)}
+                style={{ width: 170 }}>
+                <option value="">Use global setting</option>
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Download dir override:</div>
+              <DirectoryInput
+                value={downloadDir}
+                placeholder="Use global directory"
+                onChange={setDownloadDir}
+                style={{ width: 300 }}
+              />
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Output template override:</div>
+              <input
+                type="text"
+                value={downloadOutputTemplate}
+                placeholder="Use global template"
+                onChange={e => setDownloadOutputTemplate(e.target.value)}
+                style={{ width: 300 }}
+              />
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Format override:</div>
+              <input
+                type="text"
+                value={ytdlpFormat}
+                placeholder="Use global format"
+                onChange={e => setYtdlpFormat(e.target.value)}
+                style={{ width: 300 }}
+              />
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Media type override:</div>
+              <select
+                value={ytdlpMediaType}
+                onChange={e => setYtdlpMediaType(e.target.value)}
+                style={{ width: 170 }}>
+                <option value="">Use global type</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio only</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Video container override:</div>
+              <select
+                value={ytdlpVideoContainer}
+                onChange={e => setYtdlpVideoContainer(e.target.value)}
+                style={{ width: 170 }}>
+                <option value="">Use global container</option>
+                <option value="default">Best available</option>
+                <option value="mp4">MP4</option>
+                <option value="mkv">MKV</option>
+                <option value="webm">WebM</option>
+                <option value="mov">MOV</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Audio format override:</div>
+              <select
+                value={ytdlpAudioFormat}
+                onChange={e => setYtdlpAudioFormat(e.target.value)}
+                style={{ width: 170 }}>
+                <option value="">Use global audio</option>
+                <option value="mp3">MP3</option>
+                <option value="m4a">M4A</option>
+                <option value="flac">FLAC</option>
+                <option value="opus">Opus</option>
+                <option value="wav">WAV</option>
+                <option value="best">Best available</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Subtitles override:</div>
+              <select
+                value={ytdlpSubtitles}
+                onChange={e => setYtdlpSubtitles(e.target.value)}
+                style={{ width: 230 }}>
+                <option value="">Use global subtitles</option>
+                <option value="none">None</option>
+                <option value="manual">Creator subtitles</option>
+                <option value="auto">Auto-generated subtitles</option>
+                <option value="both">Creator + auto-generated</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Subtitle langs override:</div>
+              <input
+                type="text"
+                value={ytdlpSubtitleLangs}
+                placeholder="Use global languages"
+                onChange={e => setYtdlpSubtitleLangs(e.target.value)}
+                style={{ width: 300 }}
+              />
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Embed subtitles override:</div>
+              <select
+                value={ytdlpEmbedSubtitles}
+                onChange={e => setYtdlpEmbedSubtitles(e.target.value)}
+                style={{ width: 190 }}>
+                <option value="">Use global embed</option>
+                <option value="true">Embed</option>
+                <option value="false">Do not embed</option>
+              </select>
+            </div>
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Extra args override:</div>
+              <input
+                type="text"
+                value={ytdlpExtraArgs}
+                placeholder="Use global extra args"
+                onChange={e => setYtdlpExtraArgs(e.target.value)}
+                style={{ width: 300 }}
+              />
             </div>
           {/* Todo: allow overriding the feed url with a different url (eg rss-bridge) which can allow getting more than 15 items.
           HOWEVER, this might require custom parsing to get details like thumbnail (and I tested a rss-bridge URL for a playlist
@@ -159,7 +346,7 @@ function PlaylistDetailsPage() {
                 >
                   <Thumbnail src={video.thumbnail} placeholder='https://placehold.co/160x90?text=No+Thumbnail'/>
                 </a>
-                <div style={{ display: 'flex', flexDirection: 'column', padding: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', padding: '10px', flex: 1, minWidth: 0 }}>
                   <div style={{ 
                     fontSize: '1em',
                     fontWeight: 'bold',
@@ -178,6 +365,14 @@ function PlaylistDetailsPage() {
                     {new Date(video.published_at).toLocaleString()}
                   </div>
                 </div>
+                <button
+                  className='hover-blue'
+                  title="Download Video"
+                  disabled={downloadingVideoIds.has(video.video_id)}
+                  onClick={() => handleManualDownload(video)}
+                  style={{ width: 46, flexShrink: 0, borderRadius: 0 }}>
+                  <i className={`bi bi-${downloadingVideoIds.has(video.video_id) ? 'hourglass-split' : 'download'}`}/>
+                </button>
               </div>
             ))}
           </div>
