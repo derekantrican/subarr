@@ -5,9 +5,20 @@ const { fetchWithRetry, tryParseAdditionalChannelData } = require('./utils');
 const { getPostProcessors, getSettings, insertActivity, insertPlaylist, getPlaylists, deletePlaylist, updatePlaylist, insertDownload, updateDownload } = require('./dbQueries');
 
 const pollingJobs = new Map(); // Map of playlistId -> { intervalId, intervalMinutes, regex }
+const MIN_CHECK_INTERVAL_MINUTES = 5;
+
+function normalizeCheckIntervalMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 60;
+  }
+
+  return Math.max(MIN_CHECK_INTERVAL_MINUTES, Math.ceil(parsed));
+}
 
 function schedulePolling(playlist) {
   const { playlist_id, title, check_interval_minutes, regex_filter } = playlist;
+  const intervalMinutes = normalizeCheckIntervalMinutes(check_interval_minutes);
 
   // Clear existing polling if any
   if (pollingJobs.has(playlist_id)) {
@@ -16,15 +27,15 @@ function schedulePolling(playlist) {
 
   const intervalId = setInterval(() => {
     pollPlaylist(playlist); // pass full playlist object
-  }, check_interval_minutes * 60 * 1000);
+  }, intervalMinutes * 60 * 1000);
 
   pollingJobs.set(playlist_id, {
     intervalId,
-    intervalMinutes: check_interval_minutes,
+    intervalMinutes,
     regex: regex_filter
   });
 
-  console.log(`Scheduled polling for playlist '${title}' every ${check_interval_minutes} minutes`);
+  console.log(`Scheduled polling for playlist '${title}' every ${intervalMinutes} minutes`);
 }
 
 function removePolling(playlist_id) {
@@ -46,7 +57,7 @@ async function updateYtSubsPlaylists() {
 
     const fetchedSubs = data.subscriptions.map(sub => ({
       channel_id: sub.snippet.resourceId.channelId, // This isn't part of the db item, but it will be used below to grab the banner, etc info for the channel
-      playlist_id: sub.snippet.resourceId.channelId.replace(/^UC/, exclude_shorts ? 'UULF' : 'UU'), // Reference: other possible prefixes: https://stackoverflow.com/a/77816885
+      playlist_id: sub.snippet.resourceId.channelId,
       title: sub.snippet.title,
       check_interval_minutes: 15, // Even though this is hard-coded, it needs to be defined here for the schedulePolling job
       author_name: sub.snippet.title,
@@ -90,12 +101,12 @@ async function updateYtSubsPlaylists() {
   }
 }
 
-async function pollPlaylist(playlist, alertForNewVideos = true) {
+async function pollPlaylist(playlist, alertForNewVideos = true, force = false) {
   const now = Date.now();
   const lastChecked = playlist.last_checked ? new Date(playlist.last_checked).getTime() : 0;
-  const intervalMs = (playlist.check_interval_minutes || 60) * 60 * 1000;
+  const intervalMs = normalizeCheckIntervalMinutes(playlist.check_interval_minutes) * 60 * 1000;
 
-  if (now - lastChecked < intervalMs)
+  if (!force && now - lastChecked < intervalMs)
     return;
 
   console.log(`[Poll] Checking: ${playlist.title} (${playlist.playlist_id})`);
@@ -178,4 +189,4 @@ async function pollPlaylist(playlist, alertForNewVideos = true) {
   }
 }
 
-module.exports = { schedulePolling, removePolling, updateYtSubsPlaylists };
+module.exports = { schedulePolling, removePolling, updateYtSubsPlaylists, pollPlaylist, normalizeCheckIntervalMinutes };

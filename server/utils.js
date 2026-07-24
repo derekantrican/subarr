@@ -48,6 +48,24 @@ async function runCommand(command, args) {
   });
 }
 
+async function tryRunYtDlpJson(args) {
+  try {
+    const output = await runCommand('yt-dlp', args);
+    return output ? JSON.parse(output) : null;
+  }
+  catch (err) {
+    console.warn(`yt-dlp JSON fallback failed: ${err.message}`);
+    return null;
+  }
+}
+
+function uploadsPlaylistIdFromChannelId(channelId) {
+  return channelId?.startsWith('UC') ? `UU${channelId.slice(2)}` : channelId;
+}
+
+function channelIdFromUploadsPlaylistId(playlistId) {
+  return playlistId?.startsWith('UU') ? `UC${playlistId.slice(2)}` : playlistId;
+}
 
 async function tryParseAdditionalChannelData(url) {
   const response = await fetch(url);
@@ -57,7 +75,8 @@ async function tryParseAdditionalChannelData(url) {
   const channelInfo = {};
 
   if (channelFeedMatches.length > 0 && channelFeedMatches[0][0]) {
-    channelInfo.playlist_id = channelFeedMatches[0][0].match(/(UC|UU|PL|LL|FL)[\w-]{10,}/)[0].replace(/^UC/, 'UU');
+    channelInfo.channel_id = channelFeedMatches[0][0].match(/(UC|UU|PL|LL|FL)[\w-]{10,}/)[0].replace(/^UU/, 'UC');
+    channelInfo.playlist_id = channelInfo.channel_id;
   }
 
   // Also grep the channel thumbnail from the HTML source code (which could also be done for description, etc in the future)
@@ -79,6 +98,16 @@ async function tryParseAdditionalChannelData(url) {
     channelInfo.banner = bannerArray.find(b => b.height === 424)?.url ?? bannerArray[0].url;
   }
 
+  if (!channelInfo.channel_id && /youtube\.com\/(@|channel)/.test(url)) {
+    const ytdlpInfo = await tryRunYtDlpJson(`--dump-single-json --flat-playlist --playlist-end 1 "${url.replace(/\/$/, '')}/videos"`);
+    if (ytdlpInfo?.channel_id || ytdlpInfo?.id?.startsWith('UC')) {
+      channelInfo.channel_id = ytdlpInfo.channel_id || ytdlpInfo.id;
+      channelInfo.playlist_id = channelInfo.channel_id;
+      channelInfo.thumbnail = channelInfo.thumbnail || ytdlpInfo.thumbnails?.find(t => t.width >= 160)?.url || ytdlpInfo.thumbnail;
+      channelInfo.banner = channelInfo.banner || ytdlpInfo.thumbnails?.find(t => t.width >= 1000)?.url;
+    }
+  }
+
   return channelInfo;
 }
 
@@ -91,4 +120,4 @@ function getMeta() {
   };
 }
 
-module.exports = { fetchWithRetry, runCommand, tryParseAdditionalChannelData, getMeta }
+module.exports = { fetchWithRetry, runCommand, tryRunYtDlpJson, tryParseAdditionalChannelData, uploadsPlaylistIdFromChannelId, channelIdFromUploadsPlaylistId, getMeta }

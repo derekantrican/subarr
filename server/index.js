@@ -4,7 +4,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { parseVideosFromFeed } = require('./rssParser');
-const { schedulePolling, updateYtSubsPlaylists, removePolling } = require('./polling');
+const { schedulePolling, updateYtSubsPlaylists, removePolling, pollPlaylist, normalizeCheckIntervalMinutes } = require('./polling');
 const { runPostProcessor } = require('./postProcessors');
 const {
   DEFAULT_DOWNLOAD_DIR,
@@ -100,21 +100,21 @@ app.get('/api/playlists', (req, res) => {
 
 app.post('/api/playlists', async (req, res) => {
   let { playlistId } = req.body;
-  if (!/^(PL|UU|LL|FL)[\w-]{10,}$/.test(playlistId)) {
+  if (!/^(UC|PL|UU|LL|FL)[\w-]{10,}$/.test(playlistId)) {
     return res.status(400).json({ error: 'Invalid playlist ID' });
   }
 
   const settings = Object.fromEntries(getSettings().map(row => [row.key, row.value]));
   const exclude_shorts = (settings.exclude_shorts ?? 'false') === 'true'; // SQLite can't store bool
-  if (exclude_shorts) {
-    playlistId = playlistId.replace(/^^UU(?!LF)/, 'UULF'); // Reference: other possible prefixes: https://stackoverflow.com/a/77816885
+  if (exclude_shorts && playlistId.startsWith('UU')) {
+    playlistId = playlistId.replace(/^UU(?!LF)/, 'UULF'); // Reference: other possible prefixes: https://stackoverflow.com/a/77816885
     // Todo: it's worth noting that "UULF" WON'T contain recordings from past live streams (those are still in "UU", however)
   }
 
   try {
     let playlistDbId = null;
     await parseVideosFromFeed(playlistId, async playlist => {
-      if (playlistId.startsWith('UU')) {
+      if (playlistId.startsWith('UC') || playlistId.startsWith('UU')) {
         const channelInfo = await tryParseAdditionalChannelData(`https://www.youtube.com/channel/${playlist.channel_id}`);
         playlist.thumbnail = channelInfo.thumbnail;
         playlist.banner = channelInfo.banner;
@@ -173,7 +173,7 @@ app.put('/api/playlists/:id/settings', (req, res) => {
     return res.status(404).json({ error: 'Not found' });
 
   updatePlaylistSettings(playlist.playlist_id, {
-    check_interval_minutes,
+    check_interval_minutes: normalizeCheckIntervalMinutes(check_interval_minutes),
     regex_filter,
     download_enabled,
     download_dir,
@@ -192,6 +192,22 @@ app.put('/api/playlists/:id/settings', (req, res) => {
   schedulePolling(updatedPlaylist); // reschedules with updated values
 
   res.json({ success: true });
+});
+
+app.post('/api/playlists/:id/sync', async (req, res) => {
+  const playlist = getPlaylist(req.params.id);
+  if (!playlist)
+    return res.status(404).json({ error: 'Not found' });
+
+  try {
+    await pollPlaylist(playlist, true, true);
+    insertActivity(playlist.playlist_id, playlist.title, null, 'Manual sync completed', 'arrow-repeat');
+    res.json({ success: true });
+  }
+  catch (err) {
+    insertActivity(playlist.playlist_id, playlist.title, null, `Manual sync failed: ${err.message}`, 'exclamation-triangle-fill');
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/playlists/:id/videos/:videoId/download', async (req, res) => {
@@ -265,7 +281,7 @@ app.get('/api/search', async (req, res) => {
   
     const hasValidPlaylistId = query => /(UC|UU|PL|LL|FL)[\w-]{10,}/.test(query);
     if (hasValidPlaylistId(req.query.q)) {
-      const adjustedPlaylistId = req.query.q.match(/(UC|UU|PL|LL|FL)[\w-]{10,}/)[0].replace(/^UC/, 'UU');
+      const adjustedPlaylistId = req.query.q.match(/(UC|UU|PL|LL|FL)[\w-]{10,}/)[0];
       await parseVideosFromFeed(adjustedPlaylistId, playlist => { // Todo: this will print a number of things to the server console output if it fails, so we should try to prevent that
         playlistInfo = playlist
         // Todo: also call tryParseAdditionalChannelData here for UU type playlist ids (so we get the proper thumbnail & banner)

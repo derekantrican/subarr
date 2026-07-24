@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DirectoryInput from '../components/DirectoryInput';
 import Thumbnail from '../components/Thumbnail';
@@ -25,8 +25,9 @@ function PlaylistDetailsPage() {
   const [videos, setVideos] = useState([]);
   const [testingRegex, setTestingRegex] = useState(false);
   const [downloadingVideoIds, setDownloadingVideoIds] = useState(new Set());
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  useEffect(() => {
+  const refreshPlaylist = useCallback(() => {
     fetch(`/api/playlists/${id}`)
       .then(res => res.json())
       .then(data => {
@@ -49,15 +50,21 @@ function PlaylistDetailsPage() {
       .catch(err => {
         console.error('Error loading playlist', err);
       });
-  }, [id]);  
+  }, [id]);
+
+  useEffect(() => {
+    refreshPlaylist();
+  }, [refreshPlaylist]);  
 
   const handleSave = async () => {
+    const normalizedInterval = Math.max(5, Math.ceil(Number(interval) || 5));
+
     try {
       const res = await fetch(`/api/playlists/${id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          check_interval_minutes: parseInt(interval),
+          check_interval_minutes: normalizedInterval,
           regex_filter: regex,
           download_enabled: downloadEnabled,
           download_dir: downloadDir,
@@ -76,6 +83,7 @@ function PlaylistDetailsPage() {
       if (!res.ok)
         throw new Error('Failed to save');
       
+      setInterval(normalizedInterval);
       showToast('Settings saved!', 'success');
     }
     catch (err) {
@@ -83,6 +91,31 @@ function PlaylistDetailsPage() {
       showToast('Error saving settings', 'error');
     }
   };  
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+
+    try {
+      const res = await fetch(`/api/playlists/${id}/sync`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Sync failed' }));
+        throw new Error(error.error || 'Sync failed');
+      }
+
+      refreshPlaylist();
+      showToast('Sync completed', 'success');
+    }
+    catch (err) {
+      console.error(err);
+      showToast(`Sync failed: ${err.message}`, 'error');
+    }
+    finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleManualDownload = async (video) => {
     setDownloadingVideoIds(prev => new Set(prev).add(video.video_id));
@@ -144,6 +177,10 @@ function PlaylistDetailsPage() {
           <i className="bi bi-floppy-fill"></i>
           <div style={{ fontSize: 'small' }}>Save</div>
         </button>
+        <button className='hover-blue' onClick={handleSync} title="Sync Now" disabled={isSyncing}>
+          <i className={`bi bi-${isSyncing ? 'hourglass-split' : 'arrow-repeat'}`}></i>
+          <div style={{ fontSize: 'small' }}>Sync</div>
+        </button>
         <button className='hover-danger' onClick={handleDelete} title="Delete Playlist">
           <i className="bi bi-trash-fill"></i>
           <div style={{ fontSize: 'small' }}>Delete</div>
@@ -162,6 +199,7 @@ function PlaylistDetailsPage() {
                 type="number"
                 value={interval}
                 min={5} // A minimum of 5 minutes will help avoid too many iterations on the server (which might hit YouTube API limits?)
+                step={1}
                 onChange={e => setInterval(e.target.value)}
                 style={{ width: 60 }}
               />
