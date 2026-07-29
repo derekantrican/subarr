@@ -26,6 +26,8 @@ function PlaylistDetailsPage() {
   const [testingRegex, setTestingRegex] = useState(false);
   const [downloadingVideoIds, setDownloadingVideoIds] = useState(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
 
   const refreshPlaylist = useCallback(() => {
     fetch(`/api/playlists/${id}`)
@@ -173,6 +175,10 @@ function PlaylistDetailsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', padding: '0px 20px', gap: 10, backgroundColor: '#262626', height: 60 }}>
+        <button className='hover-blue' onClick={() => setShowSettings(!showSettings)} title="Toggle Settings">
+          <i className={`bi bi-${showSettings ? 'eye-slash' : 'gear-fill'}`}></i>
+          <div style={{ fontSize: 'small' }}>{showSettings ? 'Hide' : 'Settings'}</div>
+        </button>
         <button className='hover-blue' onClick={handleSave} title="Save Settings">
           <i className="bi bi-floppy-fill"></i>
           <div style={{ fontSize: 'small' }}>Save</div>
@@ -186,176 +192,233 @@ function PlaylistDetailsPage() {
           <div style={{ fontSize: 'small' }}>Delete</div>
         </button>
       </div>
-      <div style={{minHeight: 425, width: '100%', backgroundImage: playlist.banner ? `url(https://wsrv.nl/?url=${playlist.banner})` : '', backgroundColor: 'rgb(0, 0, 0, 0.7)',
-                   backgroundSize: 'cover', backgroundBlendMode: 'darken'}}>
-        <div style={{minHeight: 365, padding: 30, display: 'flex', gap: 40}}>
-          <Thumbnail className='playlistDetails-poster' height='350' width='350' src={playlist.thumbnail}/>
+      <div style={{minHeight: showSettings ? 425 : 120, width: '100%', backgroundImage: playlist.banner ? `url(https://wsrv.nl/?url=${playlist.banner})` : '', backgroundColor: 'rgb(0, 0, 0, 0.7)',
+                   backgroundSize: 'cover', backgroundBlendMode: 'darken', transition: 'min-height 0.3s ease'}}>
+        <div style={{minHeight: showSettings ? 365 : 60, padding: showSettings ? 30 : '20px 30px', display: 'flex', gap: showSettings ? 40 : 20, alignItems: showSettings ? 'flex-start' : 'center', transition: 'all 0.3s ease'}}>
+          <Thumbnail className='playlistDetails-poster' height={showSettings ? '350' : '60'} width={showSettings ? '350' : '60'} src={playlist.thumbnail} style={{transition: 'all 0.3s ease'}}/>
           <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
-            <div style={{fontSize: 'xxx-large', overflowWrap: 'anywhere'}} title={playlist.playlist_id}>{playlist.title}</div>
-            {!playlist.playlist_id.startsWith('UU') ? <div style={{fontStyle: 'italic', marginBottom: 10}}>{`By ${playlist.author_name}`}</div> : null}
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Check Interval (minutes):</div>
-              <input
-                type="number"
-                value={interval}
-                min={5} // A minimum of 5 minutes will help avoid too many iterations on the server (which might hit YouTube API limits?)
-                step={1}
-                onChange={e => setInterval(e.target.value)}
-                style={{ width: 60 }}
-              />
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Regex Filter (optional):</div>
-              <div style={{display: 'flex', alignItems: 'center', width: '100%', marginTop: 5}}>
-                <input
-                  type="text"
-                  value={regex}
-                  onChange={e => setRegex(e.target.value)}
-                  style={{ width: 300, marginTop: 0 }}
-                />
-                <button
-                  style={{fontSize: 'medium', backgroundColor: 'cornflowerblue', borderRadius: 4, marginLeft: 5, height: 30}}
-                  onClick={() => setTestingRegex(true)}>
-                  Test
-                </button>
-              </div>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Downloads:</div>
-              <select
-                value={downloadEnabled}
-                onChange={e => setDownloadEnabled(e.target.value)}
-                style={{ width: 170 }}>
-                <option value="">Use global setting</option>
-                <option value="true">Enabled</option>
-                <option value="false">Disabled</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Download dir override:</div>
-              <DirectoryInput
-                value={downloadDir}
-                placeholder="Use global directory"
-                onChange={setDownloadDir}
-                style={{ width: 300 }}
-              />
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Output template override:</div>
-              <input
-                type="text"
-                value={downloadOutputTemplate}
-                placeholder="Use global template"
-                onChange={e => setDownloadOutputTemplate(e.target.value)}
-                style={{ width: 300 }}
-              />
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Format override:</div>
-              <input
-                type="text"
-                value={ytdlpFormat}
-                placeholder="Use global format"
-                onChange={e => setYtdlpFormat(e.target.value)}
-                style={{ width: 300 }}
-              />
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Media type override:</div>
-              <select
-                value={ytdlpMediaType}
-                onChange={e => setYtdlpMediaType(e.target.value)}
-                style={{ width: 170 }}>
-                <option value="">Use global type</option>
-                <option value="video">Video</option>
-                <option value="audio">Audio only</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Video container override:</div>
-              <select
-                value={ytdlpVideoContainer}
-                onChange={e => setYtdlpVideoContainer(e.target.value)}
-                style={{ width: 170 }}>
-                <option value="">Use global container</option>
-                <option value="default">Best available</option>
-                <option value="mp4">MP4</option>
-                <option value="mkv">MKV</option>
-                <option value="webm">WebM</option>
-                <option value="mov">MOV</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Audio format override:</div>
-              <select
-                value={ytdlpAudioFormat}
-                onChange={e => setYtdlpAudioFormat(e.target.value)}
-                style={{ width: 170 }}>
-                <option value="">Use global audio</option>
-                <option value="mp3">MP3</option>
-                <option value="m4a">M4A</option>
-                <option value="flac">FLAC</option>
-                <option value="opus">Opus</option>
-                <option value="wav">WAV</option>
-                <option value="best">Best available</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Subtitles override:</div>
-              <select
-                value={ytdlpSubtitles}
-                onChange={e => setYtdlpSubtitles(e.target.value)}
-                style={{ width: 230 }}>
-                <option value="">Use global subtitles</option>
-                <option value="none">None</option>
-                <option value="manual">Creator subtitles</option>
-                <option value="auto">Auto-generated subtitles</option>
-                <option value="both">Creator + auto-generated</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Subtitle langs override:</div>
-              <input
-                type="text"
-                value={ytdlpSubtitleLangs}
-                placeholder="Use global languages"
-                onChange={e => setYtdlpSubtitleLangs(e.target.value)}
-                style={{ width: 300 }}
-              />
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Embed subtitles override:</div>
-              <select
-                value={ytdlpEmbedSubtitles}
-                onChange={e => setYtdlpEmbedSubtitles(e.target.value)}
-                style={{ width: 190 }}>
-                <option value="">Use global embed</option>
-                <option value="true">Embed</option>
-                <option value="false">Do not embed</option>
-              </select>
-            </div>
-            <div className='setting flex-column-mobile'>
-              <div style={{minWidth: 190}}>Extra args override:</div>
-              <input
-                type="text"
-                value={ytdlpExtraArgs}
-                placeholder="Use global extra args"
-                onChange={e => setYtdlpExtraArgs(e.target.value)}
-                style={{ width: 300 }}
-              />
-            </div>
-          {/* Todo: allow overriding the feed url with a different url (eg rss-bridge) which can allow getting more than 15 items.
-          HOWEVER, this might require custom parsing to get details like thumbnail (and I tested a rss-bridge URL for a playlist
-          of 114 items - some rss-bridge instances timed out and some capped the return at 99 items).
-          Looks like more can be provided via https://www.scriptbarrel.com/xml.cgi?channel_id=UCshoKvlZGZ20rVgazZp5vnQ&name=%40captainsparklez
-          (both channel_id & name are required, I think)*/}
+            <div style={{fontSize: showSettings ? 'xxx-large' : 'x-large', overflowWrap: 'anywhere', transition: 'font-size 0.3s ease'}} title={playlist.playlist_id}>{playlist.title}</div>
+            {!playlist.playlist_id.startsWith('UU') ? <div style={{fontStyle: 'italic', marginBottom: showSettings ? 10 : 0}}>{`By ${playlist.author_name}`}</div> : null}
+            {showSettings && (
+              <>
+                <div style={{display: 'flex', gap: 10, marginTop: 20, marginBottom: 10}}>
+                  <button 
+                    onClick={() => setActiveTab('general')} 
+                    style={{
+                      padding: '8px 16px', 
+                      backgroundColor: activeTab === 'general' ? 'cornflowerblue' : '#444',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}>
+                    General
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('download')} 
+                    style={{
+                      padding: '8px 16px', 
+                      backgroundColor: activeTab === 'download' ? 'cornflowerblue' : '#444',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}>
+                    Download
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('advanced')} 
+                    style={{
+                      padding: '8px 16px', 
+                      backgroundColor: activeTab === 'advanced' ? 'cornflowerblue' : '#444',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}>
+                    Advanced
+                  </button>
+                </div>
+                <div style={{maxHeight: '250px', overflowY: 'auto', paddingRight: 10}}>
+                  {activeTab === 'general' && (
+                    <>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Check Interval (minutes):</div>
+                        <input
+                          type="number"
+                          value={interval}
+                          min={5}
+                          step={1}
+                          onChange={e => setInterval(e.target.value)}
+                          style={{ width: 60 }}
+                        />
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Regex Filter (optional):</div>
+                        <div style={{display: 'flex', alignItems: 'center', width: '100%', marginTop: 5}}>
+                          <input
+                            type="text"
+                            value={regex}
+                            onChange={e => setRegex(e.target.value)}
+                            style={{ width: 300, marginTop: 0 }}
+                          />
+                          <button
+                            style={{fontSize: 'medium', backgroundColor: 'cornflowerblue', borderRadius: 4, marginLeft: 5, height: 30}}
+                            onClick={() => setTestingRegex(!testingRegex)}>
+                            {testingRegex ? 'Stop Test' : 'Test'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Downloads:</div>
+                        <select
+                          value={downloadEnabled}
+                          onChange={e => setDownloadEnabled(e.target.value)}
+                          style={{ width: 170 }}>
+                          <option value="">Use global setting</option>
+                          <option value="true">Enabled</option>
+                          <option value="false">Disabled</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {activeTab === 'download' && (
+                    <>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Download dir override:</div>
+                        <DirectoryInput
+                          value={downloadDir}
+                          placeholder="Use global directory"
+                          onChange={setDownloadDir}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Output template override:</div>
+                        <input
+                          type="text"
+                          value={downloadOutputTemplate}
+                          placeholder="Use global template"
+                          onChange={e => setDownloadOutputTemplate(e.target.value)}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Format override:</div>
+                        <input
+                          type="text"
+                          value={ytdlpFormat}
+                          placeholder="Use global format"
+                          onChange={e => setYtdlpFormat(e.target.value)}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Media type override:</div>
+                        <select
+                          value={ytdlpMediaType}
+                          onChange={e => setYtdlpMediaType(e.target.value)}
+                          style={{ width: 170 }}>
+                          <option value="">Use global type</option>
+                          <option value="video">Video</option>
+                          <option value="audio">Audio only</option>
+                        </select>
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Video container override:</div>
+                        <select
+                          value={ytdlpVideoContainer}
+                          onChange={e => setYtdlpVideoContainer(e.target.value)}
+                          style={{ width: 170 }}>
+                          <option value="">Use global container</option>
+                          <option value="default">Best available</option>
+                          <option value="mp4">MP4</option>
+                          <option value="mkv">MKV</option>
+                          <option value="webm">WebM</option>
+                          <option value="mov">MOV</option>
+                        </select>
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Audio format override:</div>
+                        <select
+                          value={ytdlpAudioFormat}
+                          onChange={e => setYtdlpAudioFormat(e.target.value)}
+                          style={{ width: 170 }}>
+                          <option value="">Use global audio</option>
+                          <option value="mp3">MP3</option>
+                          <option value="m4a">M4A</option>
+                          <option value="flac">FLAC</option>
+                          <option value="opus">Opus</option>
+                          <option value="wav">WAV</option>
+                          <option value="best">Best available</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {activeTab === 'advanced' && (
+                    <>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Subtitles override:</div>
+                        <select
+                          value={ytdlpSubtitles}
+                          onChange={e => setYtdlpSubtitles(e.target.value)}
+                          style={{ width: 230 }}>
+                          <option value="">Use global subtitles</option>
+                          <option value="none">None</option>
+                          <option value="manual">Creator subtitles</option>
+                          <option value="auto">Auto-generated subtitles</option>
+                          <option value="both">Creator + auto-generated</option>
+                        </select>
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Subtitle langs override:</div>
+                        <input
+                          type="text"
+                          value={ytdlpSubtitleLangs}
+                          placeholder="Use global languages"
+                          onChange={e => setYtdlpSubtitleLangs(e.target.value)}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Embed subtitles override:</div>
+                        <select
+                          value={ytdlpEmbedSubtitles}
+                          onChange={e => setYtdlpEmbedSubtitles(e.target.value)}
+                          style={{ width: 190 }}>
+                          <option value="">Use global embed</option>
+                          <option value="true">Embed</option>
+                          <option value="false">Do not embed</option>
+                        </select>
+                      </div>
+                      <div className='setting flex-column-mobile'>
+                        <div style={{minWidth: 190}}>Extra args override:</div>
+                        <input
+                          type="text"
+                          value={ytdlpExtraArgs}
+                          placeholder="Use global extra args"
+                          onChange={e => setYtdlpExtraArgs(e.target.value)}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
-      <div className='small-padding-mobile' style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: 30, minHeight: 0 }}>
-        {/* Todo: it would be nice if the list of recent uploads was updated dynamically when the server does its polling check */}
-        {/* Todo: show a "sort by" selector (because "PL" playlists might not be in any specific order) */}
-        <div className='playlistDetails-recentUploads'>
+      <div className='small-padding-mobile' style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '20px 30px', minHeight: 0 }}>
+        <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0 }}>Videos ({videos.length})</h2>
+          {testingRegex && regex && (
+            <div style={{ fontSize: 'small', color: '#aaa' }}>
+              Regex filter active - matching videos highlighted
+            </div>
+          )}
+        </div>
+        <div className='playlistDetails-recentUploads' style={{ flex: 1 }}>
           <div
             style={{
               display: 'flex',
@@ -369,11 +432,12 @@ function PlaylistDetailsPage() {
                 key={video.id}
                 style={{
                   display: 'flex',
-                  height: '90px',
+                  height: '120px',
                   backgroundColor: 'var(--card-bg)',
                   borderRadius: '6px',
                   overflow: 'hidden',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  border: testingRegex && regex ? (new RegExp(regex, 'i').test(video.title) ? '2px solid var(--success-color)' : '2px solid transparent') : 'none',
                 }}
               >
                 <a
@@ -382,16 +446,19 @@ function PlaylistDetailsPage() {
                   rel="noopener noreferrer"
                   style={{ flexShrink: 0 }}
                 >
-                  <Thumbnail src={video.thumbnail} placeholder='https://placehold.co/160x90?text=No+Thumbnail'/>
+                  <Thumbnail 
+                    src={video.thumbnail} 
+                    placeholder='https://placehold.co/213x120?text=No+Thumbnail'
+                    style={{ width: 213, height: 120 }}
+                  />
                 </a>
-                <div style={{ display: 'flex', flexDirection: 'column', padding: '10px', flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', padding: '15px', flex: 1, minWidth: 0 }}>
                   <div style={{ 
-                    fontSize: '1em',
+                    fontSize: '1.1em',
                     fontWeight: 'bold',
-                    color: testingRegex ? new RegExp(regex, 'i').test(video.title) ? 'var(--success-color)' : 'var(--danger-color)' : 'inherit',
-                    // The below styles limit the title to two lines on small screens & truncate the title with an ellipsis (...)
+                    color: testingRegex && regex ? (new RegExp(regex, 'i').test(video.title) ? 'inherit' : '#666') : 'inherit',
                     display: '-webkit-box',
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: 3,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -399,7 +466,7 @@ function PlaylistDetailsPage() {
                     {video.title}
                   </div>
                   <div style={{flex: 1}}/>
-                  <div style={{ fontSize: '0.75em', color: '#aaa', marginTop: '4px' }}>
+                  <div style={{ fontSize: '0.85em', color: '#aaa', marginTop: '8px' }}>
                     {new Date(video.published_at).toLocaleString()}
                   </div>
                 </div>
@@ -408,7 +475,7 @@ function PlaylistDetailsPage() {
                   title="Download Video"
                   disabled={downloadingVideoIds.has(video.video_id)}
                   onClick={() => handleManualDownload(video)}
-                  style={{ width: 46, flexShrink: 0, borderRadius: 0 }}>
+                  style={{ width: 60, flexShrink: 0, borderRadius: 0, fontSize: '1.2em' }}>
                   <i className={`bi bi-${downloadingVideoIds.has(video.video_id) ? 'hourglass-split' : 'download'}`}/>
                 </button>
               </div>
