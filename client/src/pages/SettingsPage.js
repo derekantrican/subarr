@@ -11,6 +11,7 @@ function SettingsPage() {
   const [ytdlpPath, setYtdlpPath] = useState('yt-dlp');
   const [downloadOutputTemplate, setDownloadOutputTemplate] = useState('[[playlist.title]]/%(title)s.%(ext)s');
   const [ytdlpFormat, setYtdlpFormat] = useState('bestvideo+bestaudio/best');
+  const [ytdlpQualityPreset, setYtdlpQualityPreset] = useState('best');
   const [ytdlpMediaType, setYtdlpMediaType] = useState('video');
   const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('default');
   const [ytdlpAudioFormat, setYtdlpAudioFormat] = useState('mp3');
@@ -42,6 +43,7 @@ function SettingsPage() {
         setYtdlpPath(data.ytdlp_path ?? 'yt-dlp');
         setDownloadOutputTemplate(data.download_output_template ?? '[[playlist.title]]/%(title)s.%(ext)s');
         setYtdlpFormat(data.ytdlp_format ?? 'bestvideo+bestaudio/best');
+        setYtdlpQualityPreset(data.ytdlp_quality_preset ?? 'best');
         setYtdlpMediaType(data.ytdlp_media_type ?? 'video');
         setYtdlpVideoContainer(data.ytdlp_video_container ?? 'default');
         setYtdlpAudioFormat(data.ytdlp_audio_format ?? 'mp3');
@@ -78,6 +80,7 @@ function SettingsPage() {
           ytdlp_path: ytdlpPath,
           download_output_template: downloadOutputTemplate,
           ytdlp_format: ytdlpFormat,
+          ytdlp_quality_preset: ytdlpQualityPreset,
           ytdlp_media_type: ytdlpMediaType,
           ytdlp_video_container: ytdlpVideoContainer,
           ytdlp_audio_format: ytdlpAudioFormat,
@@ -164,12 +167,47 @@ function SettingsPage() {
           />
         </div>
         <div className='setting flex-column-mobile'>
-          <div style={{minWidth: 175}}>Format selector</div>
-          <input type="text"
-            value={ytdlpFormat}
-            onChange={e => setYtdlpFormat(e.target.value)}
-          />
+          <div style={{minWidth: 175}}>Quality preset</div>
+          <select value={ytdlpQualityPreset} onChange={e => {
+            const preset = e.target.value;
+            setYtdlpQualityPreset(preset);
+            // Auto-set format based on preset
+            const presetFormats = {
+              '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
+              '1440p': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]',
+              '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+              '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+              '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
+              '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
+              '240p': 'bestvideo[height<=240]+bestaudio/best[height<=240]',
+              'best': 'bestvideo+bestaudio/best',
+              'custom': ytdlpFormat // Keep current format for custom
+            };
+            if (preset !== 'custom') {
+              setYtdlpFormat(presetFormats[preset]);
+            }
+          }}>
+            <option value="best">Best quality</option>
+            <option value="2160p">4K (2160p)</option>
+            <option value="1440p">1440p</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+            <option value="240p">240p</option>
+            <option value="custom">Custom format</option>
+          </select>
         </div>
+        {ytdlpQualityPreset === 'custom' && 
+          <div className='setting flex-column-mobile'>
+            <div style={{minWidth: 175}}>Custom format selector</div>
+            <input type="text"
+              value={ytdlpFormat}
+              onChange={e => setYtdlpFormat(e.target.value)}
+              placeholder="e.g. bestvideo[height<=1080]+bestaudio/best"
+            />
+          </div>
+        }
         <div className='setting flex-column-mobile'>
           <div style={{minWidth: 175}}>Media type</div>
           <select value={ytdlpMediaType} onChange={e => setYtdlpMediaType(e.target.value)}>

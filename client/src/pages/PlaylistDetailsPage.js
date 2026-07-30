@@ -15,6 +15,7 @@ function PlaylistDetailsPage() {
   const [downloadDir, setDownloadDir] = useState('');
   const [downloadOutputTemplate, setDownloadOutputTemplate] = useState('');
   const [ytdlpFormat, setYtdlpFormat] = useState('');
+  const [ytdlpQualityPreset, setYtdlpQualityPreset] = useState('');
   const [ytdlpMediaType, setYtdlpMediaType] = useState('');
   const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('');
   const [ytdlpAudioFormat, setYtdlpAudioFormat] = useState('');
@@ -40,6 +41,7 @@ function PlaylistDetailsPage() {
         setDownloadDir(data.playlist.download_dir ?? '');
         setDownloadOutputTemplate(data.playlist.download_output_template ?? '');
         setYtdlpFormat(data.playlist.ytdlp_format ?? '');
+        setYtdlpQualityPreset(data.playlist.ytdlp_quality_preset ?? '');
         setYtdlpMediaType(data.playlist.ytdlp_media_type ?? '');
         setYtdlpVideoContainer(data.playlist.ytdlp_video_container ?? '');
         setYtdlpAudioFormat(data.playlist.ytdlp_audio_format ?? '');
@@ -72,6 +74,7 @@ function PlaylistDetailsPage() {
           download_dir: downloadDir,
           download_output_template: downloadOutputTemplate,
           ytdlp_format: ytdlpFormat,
+          ytdlp_quality_preset: ytdlpQualityPreset,
           ytdlp_media_type: ytdlpMediaType,
           ytdlp_video_container: ytdlpVideoContainer,
           ytdlp_audio_format: ytdlpAudioFormat,
@@ -304,15 +307,53 @@ function PlaylistDetailsPage() {
                         />
                       </div>
                       <div className='setting flex-column-mobile'>
-                        <div style={{minWidth: 190}}>Format override:</div>
-                        <input
-                          type="text"
-                          value={ytdlpFormat}
-                          placeholder="Use global format"
-                          onChange={e => setYtdlpFormat(e.target.value)}
-                          style={{ width: 300 }}
-                        />
+                        <div style={{minWidth: 190}}>Quality preset override:</div>
+                        <select 
+                          value={ytdlpQualityPreset} 
+                          onChange={e => {
+                            const preset = e.target.value;
+                            setYtdlpQualityPreset(preset);
+                            // Auto-set format based on preset
+                            const presetFormats = {
+                              '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
+                              '1440p': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]',
+                              '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+                              '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+                              '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
+                              '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
+                              '240p': 'bestvideo[height<=240]+bestaudio/best[height<=240]',
+                              'best': 'bestvideo+bestaudio/best',
+                              'custom': ytdlpFormat // Keep current format for custom
+                            };
+                            if (preset !== 'custom' && preset !== '') {
+                              setYtdlpFormat(presetFormats[preset]);
+                            }
+                          }}
+                          style={{ width: 170 }}>
+                          <option value="">Use global preset</option>
+                          <option value="best">Best quality</option>
+                          <option value="2160p">4K (2160p)</option>
+                          <option value="1440p">1440p</option>
+                          <option value="1080p">1080p</option>
+                          <option value="720p">720p</option>
+                          <option value="480p">480p</option>
+                          <option value="360p">360p</option>
+                          <option value="240p">240p</option>
+                          <option value="custom">Custom format</option>
+                        </select>
                       </div>
+                      {ytdlpQualityPreset === 'custom' && 
+                        <div className='setting flex-column-mobile'>
+                          <div style={{minWidth: 190}}>Custom format override:</div>
+                          <input
+                            type="text"
+                            value={ytdlpFormat}
+                            placeholder="e.g. bestvideo[height<=1080]+bestaudio/best"
+                            onChange={e => setYtdlpFormat(e.target.value)}
+                            style={{ width: 300 }}
+                          />
+                        </div>
+                      }
                       <div className='setting flex-column-mobile'>
                         <div style={{minWidth: 190}}>Media type override:</div>
                         <select

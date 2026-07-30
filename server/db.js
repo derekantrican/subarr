@@ -109,6 +109,8 @@ ensureColumn('playlists', 'ytdlp_subtitles', 'TEXT');
 ensureColumn('playlists', 'ytdlp_subtitle_langs', 'TEXT');
 ensureColumn('playlists', 'ytdlp_embed_subtitles', 'TEXT');
 ensureColumn('playlists', 'ytdlp_extra_args', 'TEXT');
+ensureColumn('playlists', 'ytdlp_quality_preset', 'TEXT');
 ensureColumn('downloads', 'manual', 'TEXT DEFAULT "false"');
+ensureColumn('settings', 'ytdlp_quality_preset', 'TEXT');
 
 module.exports = db;
