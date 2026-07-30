@@ -66,6 +66,29 @@ Subarr is NOT intended to do the following:
 
 The Docker image includes `yt-dlp` and `ffmpeg`. To automatically download newly discovered videos, open Settings, enable **Download new videos**, and set the download directory. The default Docker path is `/downloads`, which is mounted to `./downloads` next to your `docker-compose.yml`.
 
+Example `docker-compose.yml`:
+```yaml
+services:
+  subarr:
+    image: ghcr.io/ad-archer/subarr:latest
+    container_name: subarr
+    user: "1000:1000"  # Run as your user to avoid permission issues
+    ports:
+      - "3001:3001"
+    volumes:
+      - subarr_data:/app/data
+      - ./downloads:/downloads  # Or mount your actual downloads folder
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/app/data/subarr.db
+    restart: unless-stopped
+
+volumes:
+  subarr_data:
+    driver: local
+```
+
 The default output template is:
 
 ```text
