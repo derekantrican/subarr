@@ -50,7 +50,7 @@ async function runCommand(command, args) {
 
 async function tryRunYtDlpJson(args) {
   try {
-    const output = await runCommand('yt-dlp', args);
+    const output = await runCommand('yt-dlp', `--js-runtime node ${args}`);
     return output ? JSON.parse(output) : null;
   }
   catch (err) {

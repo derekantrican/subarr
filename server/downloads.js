@@ -65,6 +65,7 @@ function getDownloadSettings(settings, playlist = {}, options = {}) {
 
 function buildYtdlpArgs(downloadSettings, outputPath, videoUrl) {
   const args = [
+    '--js-runtime', 'node',
     '--no-playlist',
     '--download-archive',
     path.join(downloadSettings.dir, '.subarr-yt-dlp-archive.txt'),
@@ -108,7 +109,14 @@ async function downloadVideo(settings, videoInfo, options = {}) {
   const outputPath = path.isAbsolute(relativeOutput)
     ? relativeOutput
     : path.join(downloadSettings.dir, relativeOutput);
-  fs.mkdirSync(downloadSettings.dir, { recursive: true });
+  
+  try {
+    const outputDir = path.dirname(outputPath);
+    fs.mkdirSync(outputDir, { recursive: true });
+  } catch (err) {
+    console.error(`Failed to create directory: ${err.message}`);
+    throw new Error(`Cannot create download directory: ${err.message}`);
+  }
 
   const videoUrl = `https://www.youtube.com/watch?v=${videoInfo.video.video_id}`;
   const args = buildYtdlpArgs(downloadSettings, outputPath, videoUrl);

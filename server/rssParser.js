@@ -63,7 +63,7 @@ function formatYtDlpDate(entry) {
 
 async function parseVideosWithYtDlp(sourceId, playlistInfoCallback, videoInfoCallback) {
   const sourceUrl = getYtDlpSourceUrl(sourceId);
-  const output = await runCommand('yt-dlp', `--ignore-errors --dump-json --playlist-end 15 "${sourceUrl}"`);
+  const output = await runCommand('yt-dlp', `--js-runtime node --ignore-errors --dump-json --playlist-end 15 "${sourceUrl}"`);
   const entries = output
     .split('\n')
     .map(line => line.trim())

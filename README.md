@@ -134,7 +134,7 @@ docker compose up -d
 Or build from source:
 
 ```bash
-git clone https://github.com/derekantrican/subarr.git
+git clone https://github.com/ad-archer/subarr.git
 cd subarr
 docker-compose up -d
 ```
@@ -165,7 +165,7 @@ npm run update:docker
 Make sure you have Node >= 18 installed, then run the following:
 
 ```
-git clone https://github.com/derekantrican/subarr.git
+git clone https://github.com/ad-archer/subarr.git
 cd subarr
 npm install
 # optionally create server/.env with PORT=5000 or whatever
