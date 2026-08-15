@@ -111,6 +111,26 @@ async function tryParseAdditionalChannelData(url) {
   return channelInfo;
 }
 
+async function getYtdlpVersion(ytdlpPath = 'yt-dlp') {
+  try {
+    return (await runCommand(ytdlpPath, '--version')).trim();
+  }
+  catch (err) {
+    console.warn(`Failed to get yt-dlp version: ${err.message}`);
+    return null;
+  }
+}
+
+// yt-dlp is installed via `pip install --user` (see Dockerfile), so it has to be updated the
+// same way - yt-dlp's own self-update flag (-U) refuses to run for pip installs and just tells
+// you to use pip instead. This only works for the bundled pip-managed install; if the user has
+// pointed "yt-dlp path" at a custom binary, this will still try (and likely fail) via pip.
+async function updateYtdlp() {
+  const output = await runCommand('pip3', 'install --no-cache-dir --user --upgrade --break-system-packages yt-dlp');
+  const version = await getYtdlpVersion();
+  return { output, version };
+}
+
 function getMeta() {
   return {
     versions: {
@@ -120,4 +140,4 @@ function getMeta() {
   };
 }
 
-module.exports = { fetchWithRetry, runCommand, tryRunYtDlpJson, tryParseAdditionalChannelData, uploadsPlaylistIdFromChannelId, channelIdFromUploadsPlaylistId, getMeta }
+module.exports = { fetchWithRetry, runCommand, tryRunYtDlpJson, tryParseAdditionalChannelData, uploadsPlaylistIdFromChannelId, channelIdFromUploadsPlaylistId, getMeta, getYtdlpVersion, updateYtdlp }

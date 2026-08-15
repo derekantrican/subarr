@@ -158,6 +158,16 @@ button:disabled {
   color: cornflowerblue;
 }
 
+.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .hover-danger:hover i {
   color: var(--danger-color);
 }

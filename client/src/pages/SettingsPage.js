@@ -13,13 +13,15 @@ function SettingsPage() {
   const [ytdlpFormat, setYtdlpFormat] = useState('bestvideo+bestaudio/best');
   const [ytdlpQualityPreset, setYtdlpQualityPreset] = useState('best');
   const [ytdlpMediaType, setYtdlpMediaType] = useState('video');
-  const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('default');
+  const [ytdlpVideoContainer, setYtdlpVideoContainer] = useState('mp4');
   const [ytdlpAudioFormat, setYtdlpAudioFormat] = useState('mp3');
   const [ytdlpSubtitles, setYtdlpSubtitles] = useState('none');
   const [ytdlpSubtitleLangs, setYtdlpSubtitleLangs] = useState('en.*');
   const [ytdlpEmbedSubtitles, setYtdlpEmbedSubtitles] = useState(false);
   const [ytdlpExtraArgs, setYtdlpExtraArgs] = useState('');
   const [postProcessors, setPostProcessors] = useState([]);
+  const [ytdlpVersion, setYtdlpVersion] = useState(null);
+  const [ytdlpUpdating, setYtdlpUpdating] = useState(false);
 
   const [editingPostProcessor, setEditingPostProcessor] = useState(null);
 
@@ -32,6 +34,7 @@ function SettingsPage() {
 
   useEffect(() => {
     refreshPostProcessors();
+    refreshYtdlpVersion();
 
     fetch('/api/settings')
       .then(res => res.json())
@@ -45,7 +48,7 @@ function SettingsPage() {
         setYtdlpFormat(data.ytdlp_format ?? 'bestvideo+bestaudio/best');
         setYtdlpQualityPreset(data.ytdlp_quality_preset ?? 'best');
         setYtdlpMediaType(data.ytdlp_media_type ?? 'video');
-        setYtdlpVideoContainer(data.ytdlp_video_container ?? 'default');
+        setYtdlpVideoContainer(data.ytdlp_video_container ?? 'mp4');
         setYtdlpAudioFormat(data.ytdlp_audio_format ?? 'mp3');
         setYtdlpSubtitles(data.ytdlp_subtitles ?? 'none');
         setYtdlpSubtitleLangs(data.ytdlp_subtitle_langs ?? 'en.*');
@@ -64,6 +67,37 @@ function SettingsPage() {
     }
     catch (err) {
       console.error('Failed to fetch postprocessors', err);
+    }
+  };
+
+  const refreshYtdlpVersion = async () => {
+    try {
+      const res = await fetch('/api/ytdlp/version');
+      const data = await res.json();
+      setYtdlpVersion(data.version);
+    }
+    catch (err) {
+      console.error('Failed to fetch yt-dlp version', err);
+    }
+  };
+
+  const handleUpdateYtdlp = async () => {
+    setYtdlpUpdating(true);
+    try {
+      const res = await fetch('/api/ytdlp/update', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success)
+        throw new Error(data.error || 'Update failed');
+
+      setYtdlpVersion(data.version);
+      showToast(`yt-dlp updated to ${data.version}`, 'success');
+    }
+    catch (err) {
+      console.error(err);
+      showToast(`Failed to update yt-dlp: ${err.message}`, 'error');
+    }
+    finally {
+      setYtdlpUpdating(false);
     }
   };
 
@@ -160,6 +194,16 @@ function SettingsPage() {
           />
         </div>
         <div className='setting flex-column-mobile'>
+          <div style={{minWidth: 175}}>yt-dlp version</div>
+          <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+            <div>{ytdlpVersion ?? 'Unknown'}</div>
+            <button className='hover-blue' onClick={handleUpdateYtdlp} disabled={ytdlpUpdating} title="Download and install the latest yt-dlp release">
+              <i className={`bi bi-arrow-repeat${ytdlpUpdating ? ' spin' : ''}`}/>
+              <div style={{fontSize: 'small'}}>{ytdlpUpdating ? 'Updating...' : 'Update yt-dlp'}</div>
+            </button>
+          </div>
+        </div>
+        <div className='setting flex-column-mobile'>
           <div style={{minWidth: 175}}>Output template</div>
           <textarea style={{resize: 'vertical', width: 'calc(100% - 18px)', minHeight: 70}}
             value={downloadOutputTemplate}
@@ -171,16 +215,19 @@ function SettingsPage() {
           <select value={ytdlpQualityPreset} onChange={e => {
             const preset = e.target.value;
             setYtdlpQualityPreset(preset);
-            // Auto-set format based on preset
+            // Auto-set format based on preset. Each prefers h264 video + AAC (m4a) audio first,
+            // since that combination plays natively on the widest range of devices (older smart
+            // TVs, game consoles, QuickTime, etc) - falling back to whatever streams are actually
+            // available (which may include vp9/opus) if no h264/AAC version exists.
             const presetFormats = {
-              '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
-              '1440p': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]',
-              '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-              '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-              '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
-              '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
-              '240p': 'bestvideo[height<=240]+bestaudio/best[height<=240]',
-              'best': 'bestvideo+bestaudio/best',
+              '2160p': 'bestvideo[vcodec^=avc1][height<=2160]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best[height<=2160]',
+              '1440p': 'bestvideo[vcodec^=avc1][height<=1440]+bestaudio[ext=m4a]/bestvideo[height<=1440]+bestaudio[ext=m4a]/bestvideo[height<=1440]+bestaudio/best[height<=1440]',
+              '1080p': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+              '720p': 'bestvideo[vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]',
+              '480p': 'bestvideo[vcodec^=avc1][height<=480]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]',
+              '360p': 'bestvideo[vcodec^=avc1][height<=360]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best[height<=360]',
+              '240p': 'bestvideo[vcodec^=avc1][height<=240]+bestaudio[ext=m4a]/bestvideo[height<=240]+bestaudio[ext=m4a]/bestvideo[height<=240]+bestaudio/best[height<=240]',
+              'best': 'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
               'custom': ytdlpFormat // Keep current format for custom
             };
             if (preset !== 'custom') {
@@ -219,11 +266,11 @@ function SettingsPage() {
           <div className='setting flex-column-mobile'>
             <div style={{minWidth: 175}}>Video container</div>
             <select value={ytdlpVideoContainer} onChange={e => setYtdlpVideoContainer(e.target.value)}>
-              <option value="default">Best available</option>
-              <option value="mp4">MP4</option>
+              <option value="mp4">MP4 (recommended, most compatible)</option>
               <option value="mkv">MKV</option>
               <option value="webm">WebM</option>
               <option value="mov">MOV</option>
+              <option value="default">Best available (may not play on older devices)</option>
             </select>
           </div>
         :

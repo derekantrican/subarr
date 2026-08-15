@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "client/src/App.css"
+        ],
+        "createdAt": "2026-08-15T22:15:56.247Z",
+        "reason": "pre-existing sidebar active-nav-item style, not part of this session's changes; out of scope"
+      }
+    ]
+  }
+}

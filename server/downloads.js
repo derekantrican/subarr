@@ -4,9 +4,12 @@ const { runCommand } = require('./utils');
 
 const DEFAULT_DOWNLOAD_DIR = '/downloads';
 const DEFAULT_OUTPUT_TEMPLATE = '[[playlist.title]]/%(title)s.%(ext)s';
-const DEFAULT_FORMAT = 'bestvideo+bestaudio/best';
+// Prefers h264 video + AAC (m4a) audio merged into mp4, since those play natively on the
+// widest range of devices (older smart TVs, game consoles, QuickTime, etc). Falls back to
+// whatever the best available streams are if no h264/AAC version exists for a video.
+const DEFAULT_FORMAT = 'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
 const DEFAULT_MEDIA_TYPE = 'video';
-const DEFAULT_VIDEO_CONTAINER = 'default';
+const DEFAULT_VIDEO_CONTAINER = 'mp4';
 const DEFAULT_AUDIO_FORMAT = 'mp3';
 const DEFAULT_SUBTITLES = 'none';
 const DEFAULT_SUBTITLE_LANGS = 'en.*';

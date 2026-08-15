@@ -17,7 +17,7 @@ const {
   DEFAULT_SUBTITLE_LANGS,
   downloadVideo,
 } = require('./downloads');
-const { tryParseAdditionalChannelData, getMeta } = require('./utils');
+const { tryParseAdditionalChannelData, getMeta, getYtdlpVersion, updateYtdlp } = require('./utils');
 const {
   getPlaylists,
   getSettings,
@@ -442,6 +442,23 @@ app.post('/api/postprocessors/test', async (req, res) => {
 app.get('/api/meta', (req, res) => {
   res.json(getMeta());
 })
+
+app.get('/api/ytdlp/version', async (req, res) => {
+  const settings = Object.fromEntries(getSettings().map(row => [row.key, row.value]));
+  const version = await getYtdlpVersion(settings.ytdlp_path || 'yt-dlp');
+  res.json({ version });
+});
+
+app.post('/api/ytdlp/update', async (req, res) => {
+  try {
+    const { output, version } = await updateYtdlp();
+    res.json({ success: true, output, version });
+  }
+  catch (err) {
+    console.error('Failed to update yt-dlp:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 if (process.env.NODE_ENV === 'production') { // In production, allow the express server to serve both the api & the client UI

@@ -35,12 +35,18 @@ FROM node:24-alpine3.22 AS production
 
 # Install runtime dependencies. yt-dlp handles the actual video downloads, and
 # ffmpeg is needed for common format merging/conversion paths.
-RUN apk add --no-cache sqlite python3 py3-pip ffmpeg su-exec \
- && pip3 install --no-cache-dir --break-system-packages yt-dlp
+RUN apk add --no-cache sqlite python3 py3-pip ffmpeg su-exec
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S subarr && \
     adduser -S subarr -u 1001
+
+# Install yt-dlp into the subarr user's own home directory (pip --user) rather than as root
+# into the system site-packages. This is what lets the app self-update yt-dlp at runtime (via
+# Settings > "Update yt-dlp") without needing root permissions to overwrite root-owned files.
+ENV HOME=/home/subarr
+ENV PATH="/home/subarr/.local/bin:${PATH}"
+RUN su-exec subarr pip3 install --no-cache-dir --user --break-system-packages yt-dlp
 
 WORKDIR /app
 
