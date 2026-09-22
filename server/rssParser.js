@@ -4,7 +4,7 @@ const { insertVideo } = require('./dbQueries');
 const parser = new Parser({
   customFields: {
     feed: ['yt:channelId', 'yt:playlistId', ['author', 'author', { keepArray: false }]],
-    item: ['media:group', 
+    item: ['media:group', 'yt:videoId',
       ['media:thumbnail', 'thumbnail', { keepArray: false }],
       ['media:statistics', 'statistics', { keepArray: false }],
     ],
@@ -27,11 +27,39 @@ async function parseUrlWithRetry(url, retries = 3, delay = 1000) {
   }
 }
 
-async function parseVideosFromFeed(playlistId, playlistInfoCallback, videoInfoCallback) {
-  // Todo: right now the feed url is hardcoded, but in the future we might want to make this an override-able property of the playlist
-  const feedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
+// Third-party feeds (eg a custom proxy) are expected to follow the same format as YouTube's feed. If playlistId
+// isn't provided, it's determined from the feed itself (or failing that, from the feed url).
+function resolvePlaylistId(feed, feedUrl) {
+  if (feed['yt:playlistId'])
+    return feed['yt:playlistId'];
+
+  if (feed['yt:channelId'])
+    return feed['yt:channelId'].replace(/^UC/, 'UU');
+
+  const match = feedUrl.match(/(UC|UU|PL|LL|FL)[\w-]{10,}/);
+  return match ? match[0].replace(/^UC/, 'UU') : null;
+}
+
+// YouTube's feed uses "yt:video:<id>" ids, but fall back to the video link for feeds that don't
+function getVideoId(item) {
+  if (item['yt:videoId'])
+    return item['yt:videoId'];
+
+  if (item.id?.startsWith('yt:video:'))
+    return item.id.split(':')[2];
+
+  return item.link?.match(/(?:[?&]v=|\/shorts\/|youtu\.be\/)([\w-]{11})/)?.[1];
+}
+
+async function parseVideosFromFeed(playlistId, playlistInfoCallback, videoInfoCallback, customFeedUrl = null) {
+  const feedUrl = customFeedUrl || `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
 
   const feed = await parseUrlWithRetry(feedUrl);
+
+  playlistId = playlistId || resolvePlaylistId(feed, feedUrl);
+  if (!playlistId)
+    throw new Error(`Could not determine a playlist id for feed '${feedUrl}'`);
+
   const channelId = feed['yt:channelId'];
   const playlistAuthor = feed.author || {};
   const playlistTitle = feed.title === 'Videos' && feed.author?.name ? 
@@ -47,11 +75,12 @@ async function parseVideosFromFeed(playlistId, playlistInfoCallback, videoInfoCa
       author_uri : playlistAuthor?.uri,
       title: playlistTitle,
       thumbnail: playlistThumbnail,
+      feed_url: customFeedUrl,
     });
   }
 
   for (const item of feed.items) {
-    const videoId = item.id?.split(':')?.[2];
+    const videoId = getVideoId(item);
     const videoTitle = item.title || 'Untitled';
     const publishedAt = item.pubDate || null;
     const videoThumbnail = item?.['media:group']?.['media:thumbnail']?.[0]?.$?.url || null;

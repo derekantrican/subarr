@@ -35,6 +35,8 @@ setInterval(() => {
 }, 60 * 60 * 1000); // YTSubs.app data only updates every 12 hours, but it might be changed to be less
 updateYtSubsPlaylists(); // also run on startup
 
+const isUrl = str => /^https?:\/\/\S+$/i.test(str);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -44,14 +46,18 @@ app.get('/api/playlists', (req, res) => {
 });
 
 app.post('/api/playlists', async (req, res) => {
-  let { playlistId } = req.body;
+  let { playlistId, feedUrl } = req.body;
   if (!/^(PL|UU|LL|FL)[\w-]{10,}$/.test(playlistId)) {
     return res.status(400).json({ error: 'Invalid playlist ID' });
   }
 
+  if (feedUrl && !isUrl(feedUrl)) {
+    return res.status(400).json({ error: 'Invalid feed URL' });
+  }
+
   const settings = Object.fromEntries(getSettings().map(row => [row.key, row.value]));
   const exclude_shorts = (settings.exclude_shorts ?? 'false') === 'true'; // SQLite can't store bool
-  if (exclude_shorts) {
+  if (exclude_shorts && !feedUrl) { // A custom feed determines its own content, so its playlist id must stay as-is
     playlistId = playlistId.replace(/^^UU(?!LF)/, 'UULF'); // Reference: other possible prefixes: https://stackoverflow.com/a/77816885
     // Todo: it's worth noting that "UULF" WON'T contain recordings from past live streams (those are still in "UU", however)
   }
@@ -73,7 +79,7 @@ app.post('/api/playlists', async (req, res) => {
       // Fetch newly added playlist to pass into schedulePolling
       const newPlaylist = getPlaylist(playlistDbId);
       schedulePolling(newPlaylist);
-    });
+    }, null, feedUrl);
 
     res.status(201).json({ id: playlistDbId });
   }
@@ -132,7 +138,14 @@ app.get('/api/search', async (req, res) => {
     let playlistInfo;
   
     const hasValidPlaylistId = query => /(UC|UU|PL|LL|FL)[\w-]{10,}/.test(query);
-    if (hasValidPlaylistId(req.query.q)) {
+    if (isUrl(req.query.q) && !/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(req.query.q)) {
+      // A non-YouTube url is treated as a custom feed (expected to be in the same format as YouTube's RSS feed).
+      // This needs to be checked first because the url may contain a playlist id (eg ?playlistId=UU...)
+      await parseVideosFromFeed(null, playlist => {
+        playlistInfo = playlist;
+      }, null, req.query.q);
+    }
+    else if (hasValidPlaylistId(req.query.q)) {
       const adjustedPlaylistId = req.query.q.match(/(UC|UU|PL|LL|FL)[\w-]{10,}/)[0].replace(/^UC/, 'UU');
       await parseVideosFromFeed(adjustedPlaylistId, playlist => { // Todo: this will print a number of things to the server console output if it fails, so we should try to prevent that
         playlistInfo = playlist

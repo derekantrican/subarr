@@ -26,7 +26,7 @@ function AddPlaylistPage() {
         try {
           setIsSearching(true);
   
-          const res = await fetch(`/api/search?q=${playlistInput}`, {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(playlistInput)}`, {
             signal: controller.signal,
           });
   
@@ -60,7 +60,7 @@ function AddPlaylistPage() {
     const res = await fetch('/api/playlists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 'playlistId': playlistInfo.playlist_id })
+      body: JSON.stringify({ 'playlistId': playlistInfo.playlist_id, 'feedUrl': playlistInfo.feed_url })
     });
 
     if (res.ok) {
@@ -82,7 +82,7 @@ function AddPlaylistPage() {
         <i className="bi bi-search" style={{fontSize: 'large', padding: '10px 15px', height: 'calc(100% - 22px)', border: 'solid 1px white', borderRight: 'none', borderRadius: '4px 0px 0px 4px'}}/>
         <input
           style={{flexGrow: 1, backgroundColor: '#333', border: 'solid 1px white', padding: '6px 16px', height: 'calc(100% - 14px)', color: 'inherit', fontSize: 'medium', outline: 'none'}}
-          placeholder='Enter a youtube channel url (eg youtube.com/@MrBeast) or playlist id/url (eg UU..., PL..., etc)'
+          placeholder='Enter a youtube channel url (eg youtube.com/@MrBeast), playlist id/url (eg UU..., PL..., etc), or a custom feed url (RSS-formatted)'
           type='text'
           value={playlistInput}
           onChange={e => setPlaylistInput(e.target.value)}/>
@@ -133,10 +133,13 @@ function AddPlaylistPage() {
           <li style={{overflowWrap: 'anywhere'}}>
             YouTube playlist urls or ids (eg UUuAXFkgsw1L7xaCfnd5JJOw or<br />https://www.youtube.com/playlist?list=PLopY4n17t8RCqmupsW66yOsR5eDPRUN_y)
           </li>
+          <li style={{overflowWrap: 'anywhere'}}>
+            Custom feed urls that use the same format as YouTube's RSS feeds<br />(eg https://www.youtube.com/feeds/videos.xml?playlist_id=... but from a different source)
+          </li>
         </ol>
       </div>
       : null}
-      {/(PL|LL|FL)[\w-]{10,}/.test(playlistInput) && <p style={{ color: 'var(--warning-color)', overflowWrap: 'anywhere', textAlign: 'center' }}>
+      {/(PL|LL|FL)[\w-]{10,}/.test(playlistInput) && !playlistInfo?.feed_url && <p style={{ color: 'var(--warning-color)', overflowWrap: 'anywhere', textAlign: 'center' }}>
         Warning: YouTube playlist RSS feeds only return the top 15 items, so if this playlist is not ordered Newest → Oldest,
         Subarr may never see new videos on this playlist (see <a href='https://issuetracker.google.com/issues/429563457' target='_blank' rel='noreferrer'>
         https://issuetracker.google.com/issues/429563457</a>). If this is the case, you may want to use the channel's

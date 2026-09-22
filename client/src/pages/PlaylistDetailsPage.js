@@ -119,11 +119,15 @@ function PlaylistDetailsPage() {
                 </button>
               </div>
             </div>
-          {/* Todo: allow overriding the feed url with a different url (eg rss-bridge) which can allow getting more than 15 items.
-          HOWEVER, this might require custom parsing to get details like thumbnail (and I tested a rss-bridge URL for a playlist
-          of 114 items - some rss-bridge instances timed out and some capped the return at 99 items).
-          Looks like more can be provided via https://www.scriptbarrel.com/xml.cgi?channel_id=UCshoKvlZGZ20rVgazZp5vnQ&name=%40captainsparklez
-          (both channel_id & name are required, I think)*/}
+            {playlist.feed_url ?
+            <div className='setting flex-column-mobile'>
+              <div style={{minWidth: 190}}>Custom Feed URL:</div>
+              <div style={{overflowWrap: 'anywhere'}}>{playlist.feed_url}</div>
+            </div>
+            : null}
+          {/* Todo: allow editing the custom feed url (currently it can only be set when adding a playlist).
+          Custom feeds are expected to use YouTube's RSS format - rss-bridge's Atom output mostly works (video ids are parsed
+          from the link), but it doesn't provide yt:channelId or media:group thumbnails. */}
           </div>
         </div>
       </div>

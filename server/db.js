@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS playlists (
   last_checked TEXT,
   thumbnail TEXT,
   banner TEXT,
-  source TEXT DEFAULT 'manual'
+  source TEXT DEFAULT 'manual',
+  feed_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS videos (
@@ -66,5 +67,11 @@ CREATE TABLE IF NOT EXISTS post_processors (
   data TEXT NOT NULL
 );
 `);
+
+// Migration: add columns introduced after the initial schema
+const playlistColumns = new Set(db.prepare(`PRAGMA table_info(playlists);`).all().map(col => col.name));
+if (!playlistColumns.has('feed_url')) {
+  db.prepare(`ALTER TABLE playlists ADD COLUMN feed_url TEXT;`).run(); // NULL = use the default YouTube RSS feed
+}
 
 module.exports = db;

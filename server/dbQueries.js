@@ -25,14 +25,14 @@ function getPlaylist(playlistDbId) {
 
 function insertPlaylist(playlist, source, updateOnConflict = false) {
   return db.prepare(`
-    INSERT INTO playlists (playlist_id, author_name, author_uri, title, check_interval_minutes, regex_filter, last_checked, thumbnail, banner, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO playlists (playlist_id, author_name, author_uri, title, check_interval_minutes, regex_filter, last_checked, thumbnail, banner, source, feed_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ${updateOnConflict ? // In the below conflict handling, "excluded" is "the thing we're trying to insert (the incoming thing)"
     `ON CONFLICT(playlist_id) DO UPDATE SET
     author_name = excluded.author_name,
     author_uri = excluded.author_uri,
     title = excluded.title,
-    /* don't overwrite check_interval_minutes, regex_filter, or last_checked */
+    /* don't overwrite check_interval_minutes, regex_filter, last_checked, or feed_url */
     thumbnail = excluded.thumbnail,
     banner = excluded.banner,
     source = excluded.source`
@@ -47,7 +47,8 @@ function insertPlaylist(playlist, source, updateOnConflict = false) {
     null,
     playlist.thumbnail,
     playlist.banner,
-    source
+    source,
+    playlist.feed_url || null
   );
 }
 

@@ -131,7 +131,7 @@ async function pollPlaylist(playlist, alertForNewVideos = true) {
           console.error(`Error running post processor '${postProcessor.name}':`, error); // Todo: should an error like this become an 'activity item' as well? (Sonarr would probably call this a "health issue")
         }
       }
-    });
+    }, playlist.feed_url);
 
     updatePlaylist(playlist.playlist_id, undefined, undefined, new Date().toISOString());
   }
