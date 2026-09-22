@@ -7,6 +7,10 @@
   "scripts": {
     "start-server": "npm --workspace client run build && NODE_ENV=production node server/index.js",
     "start-server-win": "npm --workspace client run build && SET NODE_ENV=production && node server/index.js",
-    "update": "git pull && npm install && npm run start-server"
+    "update": "git pull && npm install && npm run start-server",
+    "dev": "concurrently -k -n server,client -c blue,green \"node --watch server/index.js\" \"npm --workspace client start\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }
